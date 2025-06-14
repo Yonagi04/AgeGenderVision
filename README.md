@@ -64,4 +64,4 @@ python train_age_gender_multitask.py
 - [PyTorch](https://pytorch.org/)
 
 ---
-如有问题欢迎提 issue 或联系作者。
+如有问题欢迎提 issue 或联系作者，觉得做得不错的话，就点个Star支持一下作者吧。
