@@ -7,7 +7,7 @@ from torchvision import transforms, models
 from PIL import Image
 from tqdm import tqdm
 
-# 1. 数据集定义
+# 数据集定义
 class UTKFaceMultiTaskDataset(Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
@@ -40,7 +40,7 @@ class UTKFaceMultiTaskDataset(Dataset):
             image = self.transform(image)
         return image, torch.tensor([age], dtype=torch.float32), torch.tensor(gender, dtype=torch.long)
 
-# 2. 训练参数
+# 训练参数
 BATCH_SIZE = 64
 EPOCHS = 10
 LR = 1e-3
@@ -48,11 +48,9 @@ IMG_SIZE = 224
 DATA_DIR = 'data/UTKFace/cleaned'
 MODEL_PATH = 'age_gender_multitask_resnet18.pth'
 
-# 3. 设备
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Using device:', device)
 
-# 4. 数据增强与加载
 transform = transforms.Compose([
     transforms.Resize((IMG_SIZE, IMG_SIZE)),
     transforms.ToTensor(),
@@ -60,7 +58,6 @@ transform = transforms.Compose([
 ])
 dataset = UTKFaceMultiTaskDataset(DATA_DIR, transform)
 
-# 划分训练/验证集
 val_ratio = 0.1
 val_size = int(len(dataset) * val_ratio)
 train_size = len(dataset) - val_size
@@ -68,7 +65,6 @@ train_set, val_set = random_split(dataset, [train_size, val_size])
 train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
 val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
 
-# 5. 多任务模型
 class MultiTaskResNet18(nn.Module):
     def __init__(self):
         super().__init__()
@@ -85,12 +81,10 @@ class MultiTaskResNet18(nn.Module):
 
 model = MultiTaskResNet18().to(device)
 
-# 6. 损失与优化器
 age_criterion = nn.MSELoss()
 gender_criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=LR)
 
-# 7. 训练与验证循环
 def evaluate(loader):
     model.eval()
     total_age_loss = 0
@@ -136,11 +130,10 @@ for epoch in range(EPOCHS):
     print(f'Epoch {epoch+1}: Train AgeLoss={train_age_loss:.4f}, Train GenderLoss={train_gender_loss:.4f}, Train GenderAcc={train_gender_acc:.4f}')
     print(f'            Val AgeLoss={val_age_loss:.4f}, Val GenderLoss={val_gender_loss:.4f}, Val GenderAcc={val_gender_acc:.4f}')
 
-# 8. 保存模型
+
 torch.save(model.state_dict(), MODEL_PATH)
 print(f'Model saved to {MODEL_PATH}')
 
-# 9. 推理示例
 def predict(img_path):
     model.eval()
     img = Image.open(img_path).convert('RGB')

@@ -58,6 +58,7 @@ python train_age_gender_multitask.py
 ## 常见问题
 - OpenCV 窗口中文乱码：请用 Pillow 绘制中文，详见 `predict.py` 示例。
 - dlib/face_recognition 仅为可选依赖，主流程不依赖。
+- 训练效果不佳：请在 `train_age_gender_multitask.py` 的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
 
 ## 致谢
 - [UTKFace Dataset](https://susanqq.github.io/UTKFace/)
