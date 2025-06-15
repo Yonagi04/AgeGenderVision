@@ -1,3 +1,5 @@
+import os
+import sys
 import cv2
 import argparse
 import torch
@@ -5,11 +7,29 @@ import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
+import traceback
+import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
 args = parser.parse_args()
 model_path = args.model_path
+
+LOG_FILE = 'error_log.log'
+if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
+    DEVELOPER_MODE = True
+else:
+    DEVELOPER_MODE = os.environ.get("DEVELOPER_MODE", "0") == "1"
+
+def save_error_log(e):
+    if DEVELOPER_MODE:
+        err_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open(LOG_FILE, 'a', encoding='utf-8') as f:
+            f.write(f"\n[{err_time}] {repr(e)}\n")
+            f.write(traceback.format_exc())
+            f.write("\n")
+        print(f"发生错误，已记录到 {LOG_FILE}")
+    sys.exit(1)
 
 def cv2_add_chinese_text(img, text, position, font_size=20, color=(255, 255, 255)):
     img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -33,6 +53,12 @@ class MultiTaskResNet18(nn.Module):
         gender = self.gender_head(feat)
         return age, gender
 
+transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+        ])
+
 def predict(img, model, device):
     model.eval()
     img = transform(img).unsqueeze(0).to(device)
@@ -42,42 +68,45 @@ def predict(img, model, device):
         pred_gender = pred_gender.softmax(1).argmax(1).item()
     return pred_age, pred_gender
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = MultiTaskResNet18().to(device)
-model.load_state_dict(torch.load(model_path, weights_only=True))
+def main():
+    try:
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model = MultiTaskResNet18().to(device)
+        model.load_state_dict(torch.load(model_path, weights_only=True))
 
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-])
+        cap = cv2.VideoCapture(0)
 
-cap = cv2.VideoCapture(0)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+            for (x, y, w, h) in faces:
+                face_img = frame[y:y+h, x:x+w]
+                pil_img = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
 
-    for (x, y, w, h) in faces:
-        face_img = frame[y:y+h, x:x+w]
-        pil_img = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
+                pred_age, pred_gender = predict(pil_img, model, device)
 
-        pred_age, pred_gender = predict(pil_img, model, device)
+                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                gender_text = "男" if pred_gender == 0 else "女"
+                frame = cv2_add_chinese_text(frame, f'年龄: {pred_age:.2f}, 性别: {gender_text}', (x, y-10), 20, (255, 0, 0))
 
-        cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
-        gender_text = "男" if pred_gender == 0 else "女"
-        frame = cv2_add_chinese_text(frame, f'年龄: {pred_age:.2f}, 性别: {gender_text}', (x, y-10), 20, (255, 0, 0))
+            cv2.imshow('Result(Press Q to leave)', frame)
 
-    cv2.imshow('视频预测', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):  # 按'q'退出
+                break
 
-    if cv2.waitKey(1) & 0xFF == ord('q'):  # 按'q'退出
-        break
+        cap.release()
+        cv2.destroyAllWindows()
+    except Exception as e:
+        save_error_log(e)
 
-cap.release()
-cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+    

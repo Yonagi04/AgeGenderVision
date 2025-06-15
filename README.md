@@ -28,6 +28,10 @@ face_recognition/
 - **性别预测**：对输入人脸图片进行性别二分类（0=男，1=女）。
 - **UTKFace数据处理**：自动去重并整理 UTKFace 数据集。
 - **中文结果显示**：支持在 OpenCV 窗口中以中文显示预测结果（需 Pillow 和中文字体支持）。
+- **开发者模式**：支持开发者模式，自动保存详细日志，便于调试和排查问题。可通过命令行参数 `--dev` 或 `--developer` 启动开发者模式，或在主界面切换。
+- **模型管理**：支持模型的查看、删除。
+- **训练中断**：训练过程中可随时按 Q 键安全中断并保存当前模型。
+- **数据集自动去重**：一键去重整理 UTKFace 数据集，避免重复图片影响训练。
 
 ## 环境依赖
 
@@ -37,10 +41,11 @@ face_recognition/
 - pillow
 - opencv-python
 - tqdm
+- keyboard
 
 安装依赖：
 ```bash
-pip install torch torchvision pillow opencv-python tqdm
+pip install -r requirements.txt
 ```
 
 ## 数据准备
@@ -53,15 +58,25 @@ pip install torch torchvision pillow opencv-python tqdm
 python main.py
 ```
 
-- 选择“训练模型”可自定义参数并训练，支持训练中按 Q 键随时中断。
+或以开发者模型运行（自动保存日志）:
+```bash
+python main.py --dev
+```
+
+- 选择“训练模型”可自定义参数并训练，支持训练中按 Q 键随时中断，参数输入支持按 Q 键返回上一步。
+- 选择“查看训练模型”可查看当前所有模型文件。
 - 选择“预测图片”会弹出文件选择窗口，选择图片后自动检测人脸并显示预测结果。
 - 选择“预测视频”可调用摄像头实时预测，按 Q 键退出。
+- 选择“数据集自动去重”可自动整理并去重 UTKFace 数据集。
+- 选择“删除训练模型”可安全删除模型，需二次确认。
+- 选择“开发者模式”可在主界面切换开发者模式，开发者模式下所有异常会自动保存到日志文件。
 
 
 ## 常见问题
 - OpenCV 窗口中文乱码：请用 Pillow 绘制中文，详见 `photo_predict.py` 和 `video_predict.py` 示例。
 - 运行时缺少字体文件报错：请把可用的字体文件放到 `data` 文件夹下，默认使用的字体为simhei.tff。如果使用其他字体，请修改 `photo_predict.py` 和 `video_predict.py`。
 - dlib/face_recognition 仅为可选依赖，主流程不依赖。
+- 训练或预测时报错可通过开发者模式自动保存详细日志到 `error_log.log`，便于排查。
 - 训练效果不佳：请在 `train_age_gender_multitask.py` 的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
 
 ## 致谢
