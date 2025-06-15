@@ -16,7 +16,9 @@
 face_recognition/
 ├── check_and_deduplicate_utkface.py   # UTKFace数据去重脚本
 ├── train_age_gender_multitask.py      # 年龄性别多任务模型训练脚本
-├── predict.py                        # 年龄性别预测与中文显示示例
+├── video_predict.py                   # 视频预测
+├── photo_predict.py                   # 图片预测
+├── main.py                            # 主程序 
 └── data/UTKFace/                     # UTKFace数据集相关目录（需要自行创建）
 ```
 
@@ -45,18 +47,20 @@ pip install torch torchvision pillow opencv-python tqdm
 1. 下载 [UTKFace 数据集](https://susanqq.github.io/UTKFace/)，解压到 `data/UTKFace/archive/`。如果使用自定义的数据集，将它放到 `data` 文件夹下即可。
 2. 运行 `check_and_deduplicate_utkface.py`，自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
 
-## 训练年龄性别多任务模型
-```bash
-python train_age_gender_multitask.py
-```
-训练完成后会生成 `age_gender_multitask_resnet18.pth`。
+## 运行
 
-## 年龄性别预测与中文显示
-- 参考 `predict.py`，可对单张图片进行年龄与性别预测，并支持中文结果显示。
-- 如需显示中文，需指定本地字体路径（如 `C:/Windows/Fonts/simhei.ttf`）。
+```bash
+python main.py
+```
+
+- 选择“训练模型”可自定义参数并训练，支持训练中按 Q 键随时中断。
+- 选择“预测图片”会弹出文件选择窗口，选择图片后自动检测人脸并显示预测结果。
+- 选择“预测视频”可调用摄像头实时预测，按 Q 键退出。
+
 
 ## 常见问题
-- OpenCV 窗口中文乱码：请用 Pillow 绘制中文，详见 `predict.py` 示例。
+- OpenCV 窗口中文乱码：请用 Pillow 绘制中文，详见 `photo_predict.py` 和 `video_predict.py` 示例。
+- 运行时缺少字体文件报错：请把可用的字体文件放到 `data` 文件夹下，默认使用的字体为simhei.tff。如果使用其他字体，请修改 `photo_predict.py` 和 `video_predict.py`。
 - dlib/face_recognition 仅为可选依赖，主流程不依赖。
 - 训练效果不佳：请在 `train_age_gender_multitask.py` 的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
 

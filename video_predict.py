@@ -1,9 +1,15 @@
 import cv2
+import argparse
 import torch
 import torch.nn as nn
 from torchvision import transforms, models
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
+args = parser.parse_args()
+model_path = args.model_path
 
 def cv2_add_chinese_text(img, text, position, font_size=20, color=(255, 255, 255)):
     img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
@@ -38,7 +44,7 @@ def predict(img, model, device):
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = MultiTaskResNet18().to(device)
-model.load_state_dict(torch.load('age_gender_multitask_resnet18.pth'))
+model.load_state_dict(torch.load(model_path, weights_only=True))
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -68,7 +74,7 @@ while True:
         gender_text = "男" if pred_gender == 0 else "女"
         frame = cv2_add_chinese_text(frame, f'年龄: {pred_age:.2f}, 性别: {gender_text}', (x, y-10), 20, (255, 0, 0))
 
-    cv2.imshow('Video', frame)
+    cv2.imshow('视频预测', frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):  # 按'q'退出
         break
