@@ -47,6 +47,7 @@ def train():
             {"name": "Learning rate", "default": 1e-3, "type": float, "validator": lambda x: x > 0},
             {"name": "Image size", "default": 224, "type": int, "validator": lambda x: x > 0},
             {"name": "数据集目录", "default": 'data/UTKFace/cleaned', "type": str, "validator": None},
+            {"name": "模型类型(resnet18/resnet34/resnet50)", "default": "resnet18", "type": str, "validator": lambda x: x in ["resnet18", "resnet34", "resnet50"]},
             {"name": "模型保存路径", "default": 'age_gender_multitask_resnet18.pth', "type": str, "validator": None},
         ]
         values = [p["default"] for p in params]
@@ -95,10 +96,10 @@ def train():
                 idx += 1
             except Exception:
                 print("输入格式错误，请重新输入。")
-        batch_size, epochs, lr, img_size, data_dir, model_path = values
+        batch_size, epochs, lr, img_size, data_dir, model_type, model_path = values
         cmd = (f"{sys.executable} train_age_gender_multitask.py "
             f"--batch_size {batch_size} --epochs {epochs} --lr {lr} "
-            f"--img_size {img_size} --data_dir \"{data_dir}\" --model_path \"{model_path}\"")
+            f"--img_size {img_size} --data_dir \"{data_dir}\" --model_type \"{model_type}\" --model_path \"{model_path}\"")
         print("开始训练...\n命令:", cmd)
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"

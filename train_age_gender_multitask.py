@@ -6,6 +6,7 @@ import torch.optim as optim
 import keyboard
 import traceback
 import datetime
+import time
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms, models
 from PIL import Image
@@ -62,10 +63,17 @@ class UTKFaceMultiTaskDataset(Dataset):
         gender = self.genders[idx]
         return img, torch.tensor(age, dtype=torch.float32), torch.tensor(gender, dtype=torch.long)
 
-class MultiTaskResNet18(nn.Module):
-    def __init__(self):
+class MultiTaskResNet(nn.Module):
+    def __init__(self, model_type='resnet18'):
         super().__init__()
-        self.backbone = models.resnet18(weights=None)
+        if model_type == 'resnet18':
+            self.backbone = models.resnet18(weights=None)
+        elif model_type == 'resnet34':
+            self.backbone = models.resnet34(weights=None)
+        elif model_type == 'resnet50':
+            self.backbone = models.resnet50(weights=None)
+        else:
+            raise ValueError(f"不支持的模型类型: {model_type}")
         num_ftrs = self.backbone.fc.in_features
         self.backbone.fc = nn.Identity()
         self.age_head = nn.Linear(num_ftrs, 1)
@@ -113,10 +121,11 @@ def main():
         parser.add_argument('--lr', type=float, default=1e-3)
         parser.add_argument('--img_size', type=int, default=224)
         parser.add_argument('--data_dir', type=str, default='data/UTKFace/cleaned')
+        parser.add_argument('--model_type', type=str, default='resnet18', choices=['resnet18', 'resnet34', 'resnet50'], help='选择模型类型')
         parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
         args = parser.parse_args()
 
-        device = torch.device('CUDA' if torch.cuda.is_available() else 'CPU')
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print('使用设备:', device)
 
         transform = transforms.Compose([
@@ -140,12 +149,12 @@ def main():
         train_loader = DataLoader(train_set, batch_size=args.batch_size, shuffle=True, num_workers=0)
         val_loader = DataLoader(val_set, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-        model = MultiTaskResNet18().to(device)
+        model = MultiTaskResNet(model_type=args.model_type).to(device)
         age_criterion = nn.MSELoss()
         gender_criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
-        print("训练开始，按 Q 键随时退出。")
+        print("训练开始，在一轮训练结束时可按 Q 键退出训练。")
         for epoch in range(args.epochs):
             model.train()
             total_loss = 0
@@ -167,6 +176,7 @@ def main():
             avg_loss = total_loss / len(train_set)
             val_age_loss, val_gender_loss, val_acc = evaluate(model, val_loader, device, age_criterion, gender_criterion)
             print(f"Epoch {epoch+1}: Train Loss={avg_loss:.4f} | Val Age Loss={val_age_loss:.4f} | Val Gender Loss={val_gender_loss:.4f} | Val Gender Acc={val_acc:.4f}")
+            time.sleep(1)
 
         torch.save(model.state_dict(), args.model_path)
         print(f'Model saved to {args.model_path}')
