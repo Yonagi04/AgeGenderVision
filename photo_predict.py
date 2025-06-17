@@ -14,8 +14,10 @@ from PIL import Image, ImageFont, ImageDraw
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
+parser.add_argument('--model_type', type=str, default='ResNet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
 args = parser.parse_args()
 model_path = args.model_path
+model_type = args.model_type
 
 LOG_FILE = 'error_log.log'
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
@@ -33,10 +35,17 @@ def save_error_log(e):
         print(f"发生错误，已记录到 {LOG_FILE}")
     sys.exit(1)
 
-class MultiTaskResNet18(nn.Module):
-    def __init__(self):
+class MultiTaskResNet(nn.Module):
+    def __init__(self, model_type='resnet18'):
         super().__init__()
-        self.backbone = models.resnet18(weights=None)
+        if model_type == 'resnet18':
+            self.backbone = models.resnet18(weights=None)
+        elif model_type == 'resnet34':
+            self.backbone = models.resnet34(weights=None)
+        elif model_type == 'resnet50':
+            self.backbone = models.resnet50(weights=None)
+        else:
+            raise ValueError(f"不支持的模型类型: {model_type}")
         num_ftrs = self.backbone.fc.in_features
         self.backbone.fc = nn.Identity()
         self.age_head = nn.Linear(num_ftrs, 1)
@@ -79,7 +88,7 @@ def main():
             input("按任意键退出。")
             return
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = MultiTaskResNet18().to(device)
+        model = MultiTaskResNet(model_type=model_type).to(device)
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
         model.eval()
 
@@ -118,27 +127,6 @@ def main():
                     gender_text = '男' if gender_idx == 1 else '女'
                     results.append({'box': (x, y, w, h), 'age': age, 'gender': gender_text})
 
-        # 在图片上画框和文字
-        for res in results:
-            if res['box']:
-                x, y, w, h = res['box']
-                cv2.rectangle(img_cv, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                img_cv = cv2_add_chinese_text(
-                    img_cv,
-                    f"年龄:{res['age']:.1f} 性别:{res['gender']}",
-                    (x, y-30 if y-30 > 0 else y+5),
-                    font_size=24,
-                    color=(255,0,0)
-                )
-            else:
-                img_cv = cv2_add_chinese_text(
-                    img_cv,
-                    f"年龄:{res['age']:.1f} 性别:{res['gender']}",
-                    (10, 30),
-                    font_size=24,
-                    color=(255,0,0)
-                )
-
         # 控制台输出
         for i, res in enumerate(results):
             if res['box']:
@@ -146,6 +134,41 @@ def main():
             else:
                 print(f"整图: 预测年龄: {res['age']:.2f}，预测性别: {res['gender']}")
 
+        max_width, max_height = 1024, 768
+        h, w = img_cv.shape[:2]
+        scale = min(max_width / w, max_height / h, 1.0)
+        if scale < 1.0:
+            new_w, new_h = int(w * scale), int(h * scale)
+            img_cv = cv2.resize(img_cv, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        base_font_size = 24
+        font_size = max(int(base_font_size * scale * 2), 16)
+
+        for res in results:
+            if res['box']:
+                x, y, w_box, h_box = res['box']
+                x = int(x * scale)
+                y = int(y * scale)
+                w_box = int(w_box * scale)
+                h_box = int(h_box * scale)
+                cv2.rectangle(img_cv, (x, y), (x + w_box, y + h_box), (0, 255, 0), 2)
+                img_cv = cv2_add_chinese_text(
+                    img_cv,
+                    f"年龄:{res['age']:.1f} 性别:{res['gender']}",
+                    (x, y - 30 if y - 30 > 0 else y + 5),
+                    font_size = font_size,
+                    color = (255, 0, 0)
+                )
+            else:
+                img_cv = cv2_add_chinese_text(
+                    img_cv,
+                    f"年龄:{res['age']:.1f} 性别:{res['gender']}",
+                    (10, 30),
+                    font_size=font_size,
+                    color=(255, 0, 0)
+                )
+
+        cv2.namedWindow('Result', cv2.WINDOW_AUTOSIZE)
         cv2.imshow('Result', img_cv)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
