@@ -6,7 +6,7 @@
 
 本项目支持使用 NVIDIA GPU 进行 CUDA 加速。只需在支持 CUDA 的环境下安装对应的 PyTorch 版本，程序会自动检测并优先使用 GPU 进行训练和推理，大幅提升速度。
 
-- 若设备支持 CUDA，训练和预测时会自动输出 `Using device: cuda`。
+- 若设备支持 CUDA，训练和预测时会自动输出 `使用设备: cuda`。
 - 若无 GPU，则自动回退到 CPU。
 - 安装 CUDA 版本 PyTorch 参考：https://pytorch.org/get-started/locally/
 
@@ -51,7 +51,7 @@ pip install -r requirements.txt
 
 ## 数据准备
 1. 下载 [UTKFace 数据集](https://susanqq.github.io/UTKFace/)，解压到 `data/UTKFace/archive/`。如果使用自定义的数据集，将它放到 `data` 文件夹下即可。
-2. 运行 `check_and_deduplicate_utkface.py`，自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
+2. 运行 `check_and_deduplicate_utkface.py`，或运行 `main.py` 选择数据集自动去重功能，可自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
 
 ## 运行
 
@@ -74,15 +74,26 @@ python main.py --dev
 
 
 ## 常见问题
+- 训练或预测时报错可通过开发者模式自动保存详细日志到 `error_log.log`，便于排查。
 - OpenCV 窗口中文乱码：请用 Pillow 绘制中文，详见 `photo_predict.py` 和 `video_predict.py` 示例。
 - 运行时缺少字体文件报错：请把可用的字体文件放到 `data` 文件夹下，默认使用的字体为simhei.tff。如果使用其他字体，请修改 `photo_predict.py` 和 `video_predict.py`。
+- 运行报错提示：
+```txt
+Traceback (most recent call last):
+  File "video_predict.py", line 84, in main
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+  File "Python3.12\Lib\site-packages\torch\nn\modules\module.py", line 2584, in load_state_dict
+    raise RuntimeError
+RuntimeError: Error(s) in loading state_dict for MultiTaskResNet:
+	Missing key(s) in state_dict
+```
+请确认所选择的模型类型是否与模型匹配，如果确认模型类型选择无误且该问题能稳定复现，请携带错误日志提出 issue。
 - dlib/face_recognition 仅为可选依赖，主流程不依赖。
-- 训练或预测时报错可通过开发者模式自动保存详细日志到 `error_log.log`，便于排查。
-- 训练效果不佳：请在 `train_age_gender_multitask.py` 的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
+- 训练效果不佳：请在 `train_age_gender_multitask.py` 或 `main.py` 中 `训练模型`功能的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
 
 ## 致谢
 - [UTKFace Dataset](https://susanqq.github.io/UTKFace/)
 - [PyTorch](https://pytorch.org/)
 
 ---
-如有问题欢迎提 issue 或联系作者，觉得做得不错的话，就点个Star支持一下作者吧。
+如有问题欢迎提 issue 或联系作者，觉得做得不错的话，就点个 Star 支持一下作者吧。
