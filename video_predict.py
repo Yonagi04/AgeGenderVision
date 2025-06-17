@@ -11,9 +11,11 @@ import traceback
 import datetime
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
+parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth', help='模型路径')
+parser.add_argument('--model_type', type=str, default='ResNet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
 args = parser.parse_args()
 model_path = args.model_path
+model_type = args.model_type
 
 LOG_FILE = 'error_log.log'
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
@@ -38,10 +40,17 @@ def cv2_add_chinese_text(img, text, position, font_size=20, color=(255, 255, 255
     draw.text(position, text, font=font, fill=color)
     return cv2.cvtColor(np.array(img_pil), cv2.COLOR_RGB2BGR)
 
-class MultiTaskResNet18(nn.Module):
-    def __init__(self):
+class MultiTaskResNet(nn.Module):
+    def __init__(self, model_type='resnet18'):
         super().__init__()
-        self.backbone = models.resnet18(weights=None)
+        if model_type == 'resnet18':
+            self.backbone = models.resnet18(weights=None)
+        elif model_type == 'resnet34':
+            self.backbone = models.resnet34(weights=None)
+        elif model_type == 'resnet50':
+            self.backbone = models.resnet50(weights=None)
+        else:
+            raise ValueError(f"不支持的模型类型: {model_type}")
         in_features = self.backbone.fc.in_features
         self.backbone.fc = nn.Identity()
         self.age_head = nn.Linear(in_features, 1)
@@ -71,8 +80,8 @@ def predict(img, model, device):
 def main():
     try:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = MultiTaskResNet18().to(device)
-        model.load_state_dict(torch.load(model_path, weights_only=True))
+        model = MultiTaskResNet(model_type=model_type).to(device)
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
 
         cap = cv2.VideoCapture(0)
 
