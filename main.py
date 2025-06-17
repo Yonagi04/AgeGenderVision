@@ -40,7 +40,7 @@ def get_input_with_default(prompt, default, type_func, validator=None):
 
 def train():
     try:
-        print("请输入训练参数，直接回车使用默认值，输入q返回上一个参数：")
+        print("请输入训练参数，直接回车使用默认值，输入 Q 返回上一个参数：")
         params = [
             {"name": "Batch size", "default": 64, "type": int, "validator": lambda x: x > 0},
             {"name": "Epochs", "default": 10, "type": int, "validator": lambda x: x > 0},
@@ -97,10 +97,12 @@ def train():
             except Exception:
                 print("输入格式错误，请重新输入。")
         batch_size, epochs, lr, img_size, data_dir, model_type, model_path = values
+        if not model_path.lower().endswith('.pth'):
+            model_path += '.pth'
         cmd = (f"{sys.executable} train_age_gender_multitask.py "
             f"--batch_size {batch_size} --epochs {epochs} --lr {lr} "
             f"--img_size {img_size} --data_dir \"{data_dir}\" --model_type \"{model_type}\" --model_path \"{model_path}\"")
-        print("开始训练...\n命令:", cmd)
+        print("即将开始训练...\n")
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
         subprocess.run(cmd, shell=True, check=True, env=env)
@@ -126,15 +128,41 @@ def select_model():
         print("输入无效，默认使用第一个模型。")
         return models[0]
 
+def select_type():
+    model_types = [
+        'resnet18',
+        'resnet34',
+        'resnet50'
+    ]
+    print("\n可用的模型类型：")
+    for i, m in enumerate(model_types, 1):
+        print(f"[{i}] {m}")
+    choice = input(f"请选择模型类型（输入序号，回车默认[{model_types[0]}]）：").strip()
+    if not choice:
+        return model_types[0]
+    try:
+        idx = int(choice) - 1
+        if 0 <= idx < len(model_types):
+            return model_types[idx]
+        else:
+            print("输入序号超出范围，默认使用第一个模型类型。")
+            return model_types[0]
+    except Exception:
+        print("输入无效，默认使用第一个模型类型。")
+        return model_types[0]
+
 def photo_predict():
     try:
         model_path = select_model()
         if not model_path:
             return
+        model_type = select_type()
+        if not model_type:
+            return
         print("将进行图片预测。")
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-        cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\""
+        cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
         subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)
@@ -144,21 +172,26 @@ def video_predict():
         model_path = select_model()
         if not model_path:
             return
+        model_type = select_type()
+        if not model_type:
+            return
         print("将进行视频预测，按 Q 停止预测")
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-        cmd = f"{sys.executable} video_predict.py --model_path \"{model_path}\""
+        cmd = f"{sys.executable} video_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
         subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)
 
 def check_and_deduplicate_utkface():
     try:
-        print("将对UTKFace数据集进行自动去重处理。")
-        env = os.environ.copy()
-        env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-        cmd = f"{sys.executable} check_and_deduplicate_utkface.py"
-        subprocess.run(cmd, shell=True, check=True, env=env)
+        ans = input("确定要对数据集进行去重吗？（Y/N）：").strip().lower()
+        if ans == 'y':
+            print("将对UTKFace数据集进行自动去重处理。")
+            env = os.environ.copy()
+            env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
+            cmd = f"{sys.executable} check_and_deduplicate_utkface.py"
+            subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)
 
