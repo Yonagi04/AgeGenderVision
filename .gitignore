@@ -15,6 +15,7 @@ Thumbs.db
 .env
 *.log
 *.pth
+*.json
 *.egg-info/
 .idea/
 .vscode/

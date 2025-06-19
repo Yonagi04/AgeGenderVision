@@ -14,10 +14,12 @@ from PIL import Image, ImageFont, ImageDraw
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
-parser.add_argument('--model_type', type=str, default='ResNet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
+parser.add_argument('--model_type', type=str, default='resnet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
+parser.add_argument('--img_path', type=str, default='', help='图片路径')
 args = parser.parse_args()
 model_path = args.model_path
 model_type = args.model_type
+img_path = args.img_path
 
 LOG_FILE = 'error_log.log'
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
@@ -76,13 +78,15 @@ transform = transforms.Compose([
 
 def main():
     try:
-        root = tk.Tk()
-        root.withdraw()
-        img_path = filedialog.askopenfilename(
-            title="选择图片文件",
-            filetypes=[("图片文件", "*.jpg *.jpeg *.png *.bmp *.tiff *.webp")]
-        )
-        root.destroy()
+        global img_path
+        if img_path is None:
+            root = tk.Tk()
+            root.withdraw()
+            img_path = filedialog.askopenfilename(
+                title="选择图片文件",
+                filetypes=[("图片文件", "*.jpg *.jpeg *.png *.bmp *.tiff *.webp")]
+            )
+            root.destroy()
         if not img_path:
             print("未选择图片文件，已取消。")
             input("按任意键退出。")
@@ -172,10 +176,11 @@ def main():
         cv2.imshow('Result', img_cv)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
-        input('按任意键退出...')
     except Exception as e:
         save_error_log(e)
 
 
 if __name__ == "__main__":
     main()
+    if sys.stdin.isatty() and not os.environ.get("IS_SUBPROCESS"):
+        input("按任意键退出...")

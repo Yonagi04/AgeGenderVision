@@ -12,7 +12,7 @@ import datetime
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth', help='模型路径')
-parser.add_argument('--model_type', type=str, default='ResNet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
+parser.add_argument('--model_type', type=str, default='resnet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
 args = parser.parse_args()
 model_path = args.model_path
 model_type = args.model_type

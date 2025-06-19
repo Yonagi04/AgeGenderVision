@@ -4,3 +4,4 @@ tqdm
 pillow
 opencv-python
 keyboard
+PyQt5

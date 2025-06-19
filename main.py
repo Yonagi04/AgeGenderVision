@@ -5,6 +5,7 @@ import tkinter as tk
 import datetime
 import traceback
 import argparse
+import json
 from tkinter import filedialog
 
 parser = argparse.ArgumentParser()
@@ -12,7 +13,9 @@ parser.add_argument('--dev', '--developer', action='store_true', help='以开发
 args, unknown = parser.parse_known_args()
 
 DEVELOPER_MODE = args.dev
-LOG_FILE = 'error_log.log'
+ERROR_LOG_FILE = 'error_log.log'
+RESULE_LOG_FILE = 'result_log.log'
+MODELS_INFO_FILE = 'data/models.json'
 
 def list_models():
     print("当前已训练模型：")
@@ -24,19 +27,34 @@ def list_models():
             print(f"  [{i+1}] {m}")
     return models
 
-def get_input_with_default(prompt, default, type_func, validator=None):
-    while True:
-        s = input(f"{prompt} (默认: {default}): ").strip()
-        if not s:
-            return default
-        try:
-            value = type_func(s)
-            if validator and not validator(value):
-                print("输入不合法，请重新输入。")
-                continue
-            return value
-        except Exception:
-            print("输入格式错误，请重新输入。")
+def update_model_info(model_path, model_type, info_file=MODELS_INFO_FILE):
+    try:
+        if os.path.exists(info_file):
+            with open(info_file, 'r', encoding='utf-8') as f:
+                info = json.load(f)
+        else:
+            info = {}
+        info[model_path] = model_type
+        with open(info_file, 'w', encoding='utf-8') as f:
+            json.dump(info, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        save_error_log(e)
+
+def get_model_type(model_path, info_file=MODELS_INFO_FILE):
+    if os.path.exists(info_file):
+        with open(info_file, 'r', encoding='utf-8') as f:
+            info = json.load(f)
+        return info.get(model_path)
+    return None
+
+def delete_model_info(model_path, info_file=MODELS_INFO_FILE):
+    if os.path.exists(info_file):
+        with open(info_file, 'r', encoding='utf-8') as f:
+            info = json.load(f)
+        if model_path in info:
+            del info[model_path]
+            with open(info_file, 'w', encoding='utf-8') as f:
+                json.dump(info, f, ensure_ascii=False, indent=2)
 
 def train():
     try:
@@ -106,6 +124,7 @@ def train():
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
         subprocess.run(cmd, shell=True, check=True, env=env)
+        update_model_info(model_path, model_type)
     except Exception as e:
         save_error_log(e)
 
@@ -153,17 +172,87 @@ def select_type():
 
 def photo_predict():
     try:
-        model_path = select_model()
-        if not model_path:
-            return
-        model_type = select_type()
-        if not model_type:
-            return
-        print("将进行图片预测。")
-        env = os.environ.copy()
-        env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-        cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
-        subprocess.run(cmd, shell=True, check=True, env=env)
+        ans = input("是否需要进行多模型预测？可同时比较两个模型的结果。（Y/N）：").strip().lower()
+        if ans == 'y':
+            models = list_models()
+            if not models:
+                input("按任意键返回主菜单")
+                return
+            max_num = len(models)
+            while True:
+                sel = input(f"请输入要比较的模型序号（用英文逗号分隔，最多{max_num}个，回车取消）：").strip()
+                if not sel:
+                    print("已取消多模型预测。")
+                    return
+                try:
+                    idxs = [int(x.strip()) - 1 for x in sel.split(',') if x.strip()]
+                    if not idxs or any(i < 0 or i >= max_num for i in idxs):
+                        print("输入序号有误，请重新输入")
+                        continue
+                    idxs = list(dict.fromkeys(idxs))
+                    if len(idxs) > max_num:
+                        print(f"最多只能选择{max_num}个模型。")
+                        continue
+                    break
+                except Exception:
+                    print("输入格式有误，请重新输入。")
+            model_types = []
+            for i in idxs:
+                type = get_model_type(models[i])
+                if type is None:
+                    type = select_type()
+                model_types.append(type)
+            root = tk.Tk()
+            root.withdraw()
+            img_path = filedialog.askopenfilename(
+                title="请选择要预测的图片", 
+                filetypes=[("图片文件", "*.jpg *.jpeg *.png *.bmp *.tiff *.webp")]
+            )
+            root.destroy()
+            if not img_path:
+                print("未选择图片文件，已取消。")
+                input("按任意键退出。")
+                return
+            for i, idx in enumerate(idxs):
+                model_path = models[idx]
+                model_type = model_types[i]
+                print(f"正在用模型 {model_path} ({model_type}) 进行预测...")
+                env = os.environ.copy()
+                env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
+                env["IS_SUBPROCESS"] = "1"
+                cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\" --img_path \"{img_path}\""
+                result = subprocess.run(cmd, shell=True, check=True, env=env, capture_output=True, text=True)
+                predict_output = result.stdout.strip()
+                with open(RESULE_LOG_FILE, 'a', encoding='utf-8') as f:
+                    f.write(
+                        f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n"
+                        f"预测模型: {model_path}\n"
+                        f"模型类型: {model_type}\n"
+                        f"预测图片: {img_path}\n"
+                        f"预测结果:\n{predict_output}\n"
+                        f"{'-'*40}\n"
+                    )
+                if i < len(idxs) - 1:
+                    user_input = input(f"基于 {model_path} ({model_type}) 的预测已完成。\n按任意键以继续下一个模型的预测，或输入 Q 结束预测：").strip().lower()
+                    if user_input == 'q':
+                        break
+            print(f"\n多模型比较已经完成，详细结果请查看 {RESULE_LOG_FILE}")
+            input("按任意键返回主菜单")
+        else:
+            model_path = select_model()
+            if not model_path:
+                return
+            model_type = get_model_type(model_path)
+            if model_type is None:
+                print("未在数据文件中检测到模型，请手动选择模型类型。\n")
+                model_type = select_type()
+                if not model_type:
+                    return
+            print("将进行图片预测。")
+            env = os.environ.copy()
+            env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
+            cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
+            subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)
 
@@ -172,9 +261,12 @@ def video_predict():
         model_path = select_model()
         if not model_path:
             return
-        model_type = select_type()
-        if not model_type:
-            return
+        model_type = get_model_type(model_path)
+        if model_type is None:
+            print("未在数据文件中检测到模型，请手动选择模型类型。\n")
+            model_type = select_type()
+            if not model_type:
+                return
         print("将进行视频预测，按 Q 停止预测")
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
@@ -224,6 +316,7 @@ def delete_model():
         ans = input(f"即将永久删除模型 {model_to_delete} ，确定删除？(Y/N): ").strip().lower()
         if ans == 'y':
             os.remove(model_to_delete)
+            delete_model_info(model_to_delete)
             print(f"模型 {model_to_delete} 已成功删除。")
             input("按任意键返回主菜单")
     except Exception as e:
@@ -236,11 +329,11 @@ def clear_screen():
 def save_error_log(e):
     if DEVELOPER_MODE:
         err_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        with open(LOG_FILE, 'a', encoding='utf-8') as f:
+        with open(ERROR_LOG_FILE, 'a', encoding='utf-8') as f:
             f.write(f"\n[{err_time}] {repr(e)}\n")
             f.write(traceback.format_exc())
             f.write("\n")
-        print(f"发生错误，已记录到 {LOG_FILE}")
+        print(f"发生错误，已记录到 {ERROR_LOG_FILE}")
 
 def developer_mode():
     global DEVELOPER_MODE
