@@ -79,7 +79,7 @@ transform = transforms.Compose([
 def main():
     try:
         global img_path
-        if img_path is None:
+        if not img_path:
             root = tk.Tk()
             root.withdraw()
             img_path = filedialog.askopenfilename(
