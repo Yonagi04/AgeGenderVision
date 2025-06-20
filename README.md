@@ -1,6 +1,6 @@
 # 基于深度学习的年龄与性别预测系统
 
-本项目实现了一个基于深度学习的年龄与性别多任务预测系统，使用 UTKFace 数据集，采用 PyTorch 训练 ResNet 多任务模型，可对人脸图片或视频（基于OpenCV）进行年龄回归与性别分类。
+本项目实现了一个基于深度学习的年龄与性别多任务预测系统，使用 UTKFace 数据集，采用 PyTorch 训练 ResNet 多任务模型，可对人脸图片或视频（基于OpenCV）进行年龄回归与性别分类。支持图形界面（PyQt5）和命令行双模式操作。
 
 ## CUDA 加速支持
 
@@ -18,8 +18,9 @@ face_recognition/
 ├── train_age_gender_multitask.py      # 年龄性别多任务模型训练脚本
 ├── video_predict.py                   # 视频预测
 ├── photo_predict.py                   # 图片预测
-├── main.py                            # 主程序 
-└── data/UTKFace/                     # UTKFace数据集相关目录（需要自行创建）
+├── main.py                            # 命令行主程序 
+├── qt5_main.py                        # 图形界面主程序
+└── data/UTKFace/                      # UTKFace数据集相关目录（需要自行创建）
 ```
 
 ## 主要功能
@@ -33,6 +34,8 @@ face_recognition/
 - **训练模型选择**：支持手动选择训练模型，可选 `ResNet18`、`ResNet34`、`ResNet50` 模型
 - **训练中断**：训练过程中可随时按 Q 键安全中断并保存当前模型。
 - **数据集自动去重**：一键去重整理 UTKFace 数据集，避免重复图片影响训练。
+- **图形界面支持**：提供基于 PyQt5 的图形界面，支持所有主要功能，训练和预测过程异步执行，界面不卡死，训练日志和进度条实时显示，支持随时停止训练。
+- **命令行模式支持**：支持传统命令行交互，功能与图形界面一致。
 
 ## 环境依赖
 
@@ -43,6 +46,7 @@ face_recognition/
 - opencv-python
 - tqdm
 - keyboard
+- PyQt5
 
 安装依赖：
 ```bash
@@ -51,15 +55,23 @@ pip install -r requirements.txt
 
 ## 数据准备
 1. 下载 [UTKFace 数据集](https://susanqq.github.io/UTKFace/)，解压到 `data/UTKFace/archive/`。如果使用自定义的数据集，将它放到 `data` 文件夹下即可。
-2. 运行 `check_and_deduplicate_utkface.py`，或运行 `main.py` 选择数据集自动去重功能，可自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
+2. 运行 `check_and_deduplicate_utkface.py`，或在主界面选择数据集自动去重功能，可自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
 
 ## 运行
+
+### 图形界面模式（推荐）
+
+```bash
+python qt5_main.py
+```
+
+### 命令行模式
 
 ```bash
 python main.py
 ```
 
-或以开发者模型运行（自动保存日志）:
+或以开发者模式运行（自动保存日志）:
 ```bash
 python main.py --dev
 ```
@@ -74,7 +86,8 @@ python main.py --dev
 
 
 ## 常见问题
-- 训练或预测时报错可通过开发者模式自动保存详细日志到 `error_log.log`，便于排查。
+- 使用命令行模式训练或预测时报错可通过开发者模式自动保存详细日志到 `error_log.log`，便于排查。
+- 图形界面暂不支持开发者模式的启用。如果在使用图形界面时，遇到缺陷或非预期内结果且该问题能够稳定复现，请启动命令行程序并以开发者模式运行，尝试重新复现并记录日志。如果确定为缺陷，请携带日志、附有有用信息的截图提出 issue。
 - OpenCV 窗口中文乱码：请用 Pillow 绘制中文，详见 `photo_predict.py` 和 `video_predict.py` 示例。
 - 运行时缺少字体文件报错：请把可用的字体文件放到 `data` 文件夹下，默认使用的字体为simhei.tff。如果使用其他字体，请修改 `photo_predict.py` 和 `video_predict.py`。
 - 运行报错提示：
