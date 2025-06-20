@@ -5,3 +5,4 @@ pillow
 opencv-python
 keyboard
 PyQt5
+ultralytics

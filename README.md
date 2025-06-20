@@ -1,6 +1,6 @@
 # 基于深度学习的年龄与性别预测系统
 
-本项目实现了一个基于深度学习的年龄与性别多任务预测系统，使用 UTKFace 数据集，采用 PyTorch 训练 ResNet 多任务模型，可对人脸图片或视频（基于OpenCV）进行年龄回归与性别分类。支持图形界面（PyQt5）和命令行双模式操作。
+本项目实现了一个基于深度学习的年龄与性别多任务预测系统，使用 UTKFace 数据集，采用 PyTorch 训练 ResNet 多任务模型，可对人脸图片或视频（基于OpenCV和YOLO）进行年龄回归与性别分类。支持图形界面（PyQt5）和命令行双模式操作。
 
 ## CUDA 加速支持
 
@@ -14,12 +14,13 @@
 
 ```
 face_recognition/
-├── check_and_deduplicate_utkface.py   # UTKFace数据去重脚本
-├── train_age_gender_multitask.py      # 年龄性别多任务模型训练脚本
-├── video_predict.py                   # 视频预测
-├── photo_predict.py                   # 图片预测
+├── check_and_deduplicate_utkface.py   # UTKFace数据去重脚本 （可独立运行）
+├── train_age_gender_multitask.py      # 年龄性别多任务模型训练脚本 （可独立运行）
+├── video_predict.py                   # 视频预测 （可独立运行）
+├── photo_predict.py                   # 图片预测 （可独立运行）
 ├── main.py                            # 命令行主程序 
 ├── qt5_main.py                        # 图形界面主程序
+├── yolov8m-face.pt                    # YOLOv8m-face模型
 └── data/UTKFace/                      # UTKFace数据集相关目录（需要自行创建）
 ```
 
@@ -47,6 +48,7 @@ face_recognition/
 - tqdm
 - keyboard
 - PyQt5
+- ultralytics
 
 安装依赖：
 ```bash
@@ -59,13 +61,13 @@ pip install -r requirements.txt
 
 ## 运行
 
-### 图形界面模式（推荐）
+### 主程序图形界面模式（推荐）
 
 ```bash
 python qt5_main.py
 ```
 
-### 命令行模式
+### 主程序命令行模式
 
 ```bash
 python main.py
@@ -84,6 +86,9 @@ python main.py --dev
 - 选择“删除训练模型”可安全删除模型，需二次确认。
 - 选择“开发者模式”可在主界面切换开发者模式，开发者模式下所有异常会自动保存到日志文件。
 
+### 其他脚本
+
+除了 `main.py`、`qt5_main.py` 主程序外，其他脚本文件均可独立运行，也可以被其他的程序调用。
 
 ## 常见问题
 - 使用命令行模式训练或预测时报错可通过开发者模式自动保存详细日志到 `error_log.log`，便于排查。

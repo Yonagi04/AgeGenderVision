@@ -9,6 +9,7 @@ from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import traceback
 import datetime
+from ultralytics import YOLO
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth', help='模型路径')
@@ -18,6 +19,7 @@ model_path = args.model_path
 model_type = args.model_type
 
 LOG_FILE = 'error_log.log'
+YOLO_PATH = 'yolov8m-face.pt'
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
     DEVELOPER_MODE = True
 else:
@@ -84,26 +86,33 @@ def main():
         model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
 
         cap = cv2.VideoCapture(0)
-
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        
+        yolo_device = 0 if torch.cuda.is_available() else 'cpu'
+        yolo_face = YOLO(YOLO_PATH, verbose=False)
+        yolo_face.to(yolo_device)
 
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
 
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
-
-            for (x, y, w, h) in faces:
-                face_img = frame[y:y+h, x:x+w]
+            results = yolo_face(frame, device=yolo_device, verbose=False)
+            for box in results[0].boxes.xyxy.cpu().numpy():
+                x1, y1, x2, y2 = map(int, box[:4])
+                x1, y1 = max(0, x1), max(0, y1)
+                x2, y2 = min(frame.shape[1], x2), min(frame.shape[0], y2)
+                if x2 <= x1 or y2 <= y1:
+                    continue
+                face_img = frame[y1:y2, x1:x2]
+                if face_img.size == 0:
+                    continue
                 pil_img = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
 
                 pred_age, pred_gender = predict(pil_img, model, device)
 
-                cv2.rectangle(frame, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
                 gender_text = "男" if pred_gender == 0 else "女"
-                frame = cv2_add_chinese_text(frame, f'年龄: {pred_age:.2f}, 性别: {gender_text}', (x, y-10), 20, (255, 0, 0))
+                frame = cv2_add_chinese_text(frame, f'年龄: {pred_age:.2f}, 性别: {gender_text}', (x1, y1-10), 20, (255, 0, 0))
 
             cv2.imshow('Result(Press Q to leave)', frame)
 

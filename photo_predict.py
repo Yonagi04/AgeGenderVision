@@ -11,6 +11,7 @@ import numpy as np
 from tkinter import filedialog
 from torchvision import transforms, models
 from PIL import Image, ImageFont, ImageDraw
+from ultralytics import YOLO
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
@@ -22,6 +23,8 @@ model_type = args.model_type
 img_path = args.img_path
 
 LOG_FILE = 'error_log.log'
+YOLO_PATH = 'yolov8m-face.pt'
+
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
     DEVELOPER_MODE = True
 else:
@@ -103,10 +106,18 @@ def main():
             input('按任意键退出...')
             exit()
 
-        # 人脸检测
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray = cv2.cvtColor(img_cv, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+        yolo_device = 0 if torch.cuda.is_available() else 'cpu'
+        yolo_face = YOLO(YOLO_PATH, verbose=False)
+        yolo_face.to(yolo_device)
+        results = yolo_face(img_cv, device=yolo_device, verbose=False)
+        
+        faces = []
+        for box in results[0].boxes.xyxy.cpu().numpy():
+            x1, y1, x2, y2 = map(int, box[:4])
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(img_cv.shape[1], x2), min(img_cv.shape[0], y2)
+            if x2 > x1 and y2 > y1:
+                faces.append((x1, y1, x2 - x1, y2 - y1))
 
         results = []
         result_str = ""
