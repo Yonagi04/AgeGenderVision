@@ -7,12 +7,14 @@ import keyboard
 import traceback
 import datetime
 import time
+import sys
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms, models
 from PIL import Image
 from tqdm import tqdm
 
 LOG_FILE = 'error_log.log'
+STOP_FLAG_FILE = os.path.abspath("stop.flag")
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
     DEVELOPER_MODE = True
 else:
@@ -155,14 +157,35 @@ def main():
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
         print("训练开始，在一轮训练结束时可按 Q 键退出训练。")
+        is_tty = sys.stdout.isatty()
         for epoch in range(args.epochs):
             model.train()
             total_loss = 0
-            for imgs, ages, genders in tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}", ncols=80):
+            if is_tty:
+                pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}")
+            else:
+                pbar = tqdm(
+                    train_loader,
+                    desc=f"Epoch {epoch+1}/{args.epochs}",
+                    ncols=80,
+                    file=sys.stdout,
+                    mininterval=0,
+                    miniters=1,
+                    dynamic_ncols=True,
+                    leave=True,
+                    bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+                )
+            for imgs, ages, genders in pbar:
                 if keyboard.is_pressed('q'):
                     print("\n检测到 Q 键，提前结束训练。")
                     torch.save(model.state_dict(), args.model_path)
                     print(f'模型已保存到 {args.model_path}，模型可能不完善，请特别注意。')
+                    return
+                if os.path.exists(STOP_FLAG_FILE):
+                    print("\n检测到停止标志，提前结束训练。")
+                    torch.save(model.state_dict(), args.model_path)
+                    print(f'模型已保存到 {args.model_path}，模型可能不完善，请特别注意。')
+                    os.remove(STOP_FLAG_FILE)
                     return
                 imgs, ages, genders = imgs.to(device), ages.to(device), genders.to(device)
                 optimizer.zero_grad()
@@ -173,6 +196,8 @@ def main():
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item() * imgs.size(0)
+                if not is_tty:
+                    sys.stdout.flush()
             avg_loss = total_loss / len(train_set)
             val_age_loss, val_gender_loss, val_acc = evaluate(model, val_loader, device, age_criterion, gender_criterion)
             print(f"Epoch {epoch+1}: Train Loss={avg_loss:.4f} | Val Age Loss={val_age_loss:.4f} | Val Gender Loss={val_gender_loss:.4f} | Val Gender Acc={val_acc:.4f}")

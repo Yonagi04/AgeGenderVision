@@ -109,6 +109,7 @@ def main():
         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
         results = []
+        result_str = ""
         if len(faces) == 0:
             # 未检测到人脸，直接对整张图预测
             img_pil = Image.fromarray(cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB))
@@ -119,8 +120,9 @@ def main():
                 gender_idx = pred_gender.argmax(dim=1).item()
                 gender_text = '男' if gender_idx == 1 else '女'
                 results.append({'box': None, 'age': age, 'gender': gender_text})
+                result_str += f"整图: 预测年龄: {age:.2f}，预测性别: {gender_text}\n"
         else:
-            for (x, y, w, h) in faces:
+            for i, (x, y, w, h) in enumerate(faces):
                 face_img = img_cv[y:y+h, x:x+w]
                 img_pil = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
                 input_tensor = transform(img_pil).unsqueeze(0).to(device)
@@ -130,13 +132,10 @@ def main():
                     gender_idx = pred_gender.argmax(dim=1).item()
                     gender_text = '男' if gender_idx == 1 else '女'
                     results.append({'box': (x, y, w, h), 'age': age, 'gender': gender_text})
+                    result_str += f"人脸{i+1}: 预测年龄: {age:.2f}，预测性别: {gender_text}\n"
 
         # 控制台输出
-        for i, res in enumerate(results):
-            if res['box']:
-                print(f"人脸{i+1}: 预测年龄: {res['age']:.2f}，预测性别: {res['gender']}")
-            else:
-                print(f"整图: 预测年龄: {res['age']:.2f}，预测性别: {res['gender']}")
+        print(result_str.strip())
 
         max_width, max_height = 1024, 768
         h, w = img_cv.shape[:2]
