@@ -2,14 +2,13 @@ import sys
 import os
 import json
 import datetime
-import subprocess
 from PyQt5.QtWidgets import (
-    QApplication, QWidget, QPushButton, QVBoxLayout, QProgressBar, QLabel, QFileDialog,
-    QMessageBox, QInputDialog, QTextEdit, QDialog, QCheckBox, QProgressDialog,
-    QFormLayout, QLineEdit, QHBoxLayout, QComboBox
+    QApplication, QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
+    QTextEdit, QComboBox, QFormLayout, QFileDialog, QProgressBar, QCheckBox, QStackedWidget,
+    QProgressDialog, QSizePolicy, QSpacerItem, QMessageBox, QDialog
 )
-from PyQt5.QtGui import QTextCursor, QIcon
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
+from PyQt5.QtGui import QIcon, QTextCursor
 
 RESULT_LOG_FILE = 'result_log.log'
 MODELS_INFO_FILE = 'data/models.json'
@@ -27,33 +26,11 @@ def get_model_type(model_path):
         t = info.get(model_path)
         if t:
             return t
-    types = ['resnet18', 'resnet34', 'resnet50']
-    t, ok = QInputDialog.getItem(None, "模型类型", "请选择模型类型：", types, 0, False)
-    return t if ok else types[0]
+    return 'resnet18'
 
 def load_qss(app, qss_file):
     with open(qss_file, encoding='utf-8') as f:
         app.setStyleSheet(f.read())
-
-class PThread(QThread):
-    finished = pyqtSignal(str, object)
-
-    def __init__(self, cmd, env, capture_output=True):
-        super().__init__()
-        self.cmd = cmd
-        self.env = env
-        self.capture_output = capture_output
-
-    def run(self):
-        try:
-            if self.capture_output:
-                result = subprocess.run(self.cmd, shell=True, check=True, capture_output=True, text=True, env=self.env)
-                self.finished.emit(result.stdout, None)
-            else:
-                subprocess.run(self.cmd, shell=True, check=True, env=self.env)
-                self.finished.emit("", None)
-        except Exception as e:
-            self.finished.emit("", e)
 
 class TrainThread(QThread):
     log_signal = pyqtSignal(str)
@@ -65,14 +42,13 @@ class TrainThread(QThread):
         self.cmd = cmd
         self.env = env
         self._process = None
-        self._stop_flag = False
-    
+
     def run(self):
         import subprocess
         try:
             self._process = subprocess.Popen(
                 self.cmd, shell=True, env=self.env,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, 
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 bufsize=1, universal_newlines=True
             )
             epoch = 0
@@ -89,7 +65,6 @@ class TrainThread(QThread):
                             percent = int(epoch / total_epochs * 100)
                             self.progress_signal.emit(percent)
                 if os.path.exists(STOP_FLAG_FILE):
-                    self._stop_flag = True
                     self._process.terminate()
                     break
             self._process.wait()
@@ -98,453 +73,545 @@ class TrainThread(QThread):
             self.finished.emit(e)
 
     def stop(self):
-        with open("stop.flag", "w") as f:
-            f.write("stop")        
+        with open(STOP_FLAG_FILE, "w") as f:
+            f.write("stop")
 
-class TrainDialog(QDialog):
+class PThread(QThread):
+    finished = pyqtSignal(str, object)
+
+    def __init__(self, cmd, env, capture_output=True):
+        super().__init__()
+        self.cmd = cmd
+        self.env = env
+        self.capture_output = capture_output
+
+    def run(self):
+        import subprocess
+        try:
+            if self.capture_output:
+                result = subprocess.run(self.cmd, shell=True, check=True, capture_output=True, text=True, env=self.env)
+                self.finished.emit(result.stdout, None)
+            else:
+                subprocess.run(self.cmd, shell=True, check=True, env=self.env)
+                self.finished.emit("", None)
+        except Exception as e:
+            self.finished.emit("", e)
+
+class TrainPanel(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("训练模型参数")
-        self.labels = ["Batch size", "Epochs", "Learning rate", "Image size", "数据集目录", "模型类型", "模型保存路径"]
-        self.defaults = [64, 10, 1e-3, 224, 'data/UTKFace/cleaned', 'resnet18', 'age_gender_multitask_resnet18.pth']
-        self.edits = []
-        layout = QFormLayout()
-        for idx, (label, default) in enumerate(zip(self.labels, self.defaults)):
-            if label == "模型类型":
-                combo = QComboBox()
-                combo.addItems(['resnet18', 'resnet34', 'resnet50'])
-                combo.setCurrentText(str(default))
-                layout.addRow(label, combo)
-                self.edits.append(combo)
-            else:
-                edit = QLineEdit(str(default))
-                layout.addRow(label, edit)
-                self.edits.append(edit)
-        btn_ok = QPushButton("确定")
-        btn_ok.clicked.connect(self.validate_and_accept)
-        layout.addRow(btn_ok)
-        self.setLayout(layout)
-    
-    def validate_and_accept(self):
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.batch_size = QLineEdit("64")
+        self.epochs = QLineEdit("10")
+        self.lr = QLineEdit("0.001")
+        self.img_size = QLineEdit("224")
+        self.data_dir = QLineEdit("data/UTKFace/cleaned")
+        self.model_type = QComboBox()
+        self.model_type.addItems(['resnet18', 'resnet34', 'resnet50'])
+        self.model_path = QLineEdit("age_gender_multitask_resnet18.pth")
+        form.addRow("Batch size", self.batch_size)
+        form.addRow("Epochs", self.epochs)
+        form.addRow("Learning rate", self.lr)
+        form.addRow("Image size", self.img_size)
+        form.addRow("数据集目录", self.data_dir)
+        form.addRow("模型类型", self.model_type)
+        form.addRow("模型保存路径", self.model_path)
+        layout.addLayout(form)
+        self.btn_train = QPushButton("开始训练")
+        self.btn_stop = QPushButton("停止训练")
+        self.btn_stop.setEnabled(False)
+        btn_h = QHBoxLayout()
+        btn_h.addWidget(self.btn_train)
+        btn_h.addWidget(self.btn_stop)
+        layout.addLayout(btn_h)
+        self.progress = QProgressBar()
+        self.progress.setRange(0, 100)
+        layout.addWidget(self.progress)
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        layout.addWidget(self.log_text)
+        layout.addStretch()
+        self.btn_train.clicked.connect(self.start_train)
+        self.btn_stop.clicked.connect(self.stop_train)
+        self.train_thread = None
+
+    def start_train(self):
         try:
-            batch_size = int(self.edits[0].text())
-            epoch = int(self.edits[1].text())
-            lr = float(self.edits[2].text())
-            img_size = int(self.edits[3].text())
-            data_dir = self.edits[4].text().strip()
-            model_type = self.edits[5].text().strip()
-            model_path = self.edits[6].text().strip()
-            if batch_size <= 0 or epoch <= 0 or lr <= 0 or img_size <= 0:
+            batch_size = int(self.batch_size.text())
+            epochs = int(self.epochs.text())
+            lr = float(self.lr.text())
+            img_size = int(self.img_size.text())
+            data_dir = self.data_dir.text().strip()
+            model_type = self.model_type.currentText()
+            model_path = self.model_path.text().strip()
+            if batch_size <= 0 or epochs <= 0 or lr <= 0 or img_size <= 0:
                 raise ValueError("Batch size、Epochs、Learning rate、Image size 必须为正数")
             if not os.path.isdir(data_dir):
                 raise ValueError("数据集目录不存在")
-            if model_type not in ['resnet18', 'resnet34', 'resnet50']:
-                raise ValueError("模型类型必须为 resnet18、resnet34 或 resnet50")
             if not model_path.lower().endswith('.pth'):
                 model_path += '.pth'
             if not model_path:
                 raise ValueError("模型保存路径不能为空")
         except Exception as e:
-            msg = QMessageBox(QMessageBox.Warning, "参数错误", f"参数不合法：{e}", parent=self)
-            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            msg.exec_()
+            self.log_text.append(f"参数错误：{e}")
             return
-        self.accept()
+        if os.path.exists(STOP_FLAG_FILE):
+            os.remove(STOP_FLAG_FILE)
+        cmd = (f"{sys.executable} train_age_gender_multitask.py "
+               f"--batch_size {batch_size} --epochs {epochs} --lr {lr} "
+               f"--img_size {img_size} --data_dir \"{data_dir}\" --model_type \"{model_type}\" --model_path \"{model_path}\"")
+        env = os.environ.copy()
+        self.log_text.clear()
+        self.progress.setValue(0)
+        self.btn_train.setEnabled(False)
+        self.btn_stop.setEnabled(True)
+        self.train_thread = TrainThread(cmd, env)
+        self.train_thread.log_signal.connect(self.log_text.append)
+        self.train_thread.progress_signal.connect(self.progress.setValue)
+        def on_finish(error):
+            self.btn_train.setEnabled(True)
+            self.btn_stop.setEnabled(False)
+            if error:
+                self.log_text.append(f"训练失败：{error}")
+            else:
+                self.log_text.append("训练完成！")
+                if os.path.exists(model_path):
+                    try:
+                        if os.path.exists(MODELS_INFO_FILE):
+                            with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+                                info = json.load(f)
+                        else:
+                            info = {}
+                        info[model_path] = model_type
+                        with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
+                            json.dump(info, f, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        self.log_text.append(f"模型信息写入失败：{e}")
+                else:
+                    self.log_text.append("模型保存失败！请排查原因。")
+        self.train_thread.finished.connect(on_finish)
+        self.train_thread.start()
 
-    def get_params(self):
-        values = [e.text().strip() for e in self.edits]
-        if not values[6].lower().endswith('.pth'):
-            values[6] += '.pth'
-        return values
+    def stop_train(self):
+        if self.train_thread:
+            self.train_thread.stop()
+            self.log_text.append("已请求停止训练...")
 
-class MainWindow(QWidget):
+class ModelListPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.model_list = QTextEdit()
+        self.model_list.setReadOnly(True)
+        layout.addWidget(QLabel("已训练模型列表"))
+        layout.addWidget(self.model_list)
+        self.refresh_btn = QPushButton("刷新")
+        layout.addWidget(self.refresh_btn)
+        layout.addStretch()
+        self.refresh_btn.clicked.connect(self.refresh)
+        self.refresh()
+
+    def refresh(self):
+        models = refresh_model_list()
+        if not models:
+            self.model_list.setText("暂无模型文件")
+        else:
+            self.model_list.setText('\n'.join(models))
+
+class PredictImagePanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.model_combo = QComboBox()
+        self.refresh_models()
+        self.img_path = QLineEdit()
+        self.img_path.setPlaceholderText("请选择图片")
+        btn_img = QPushButton("选择图片")
+        btn_img.clicked.connect(self.select_image)
+        h_img = QHBoxLayout()
+        h_img.addWidget(self.img_path)
+        h_img.addWidget(btn_img)
+        layout.addWidget(QLabel("选择模型"))
+        layout.addWidget(self.model_combo)
+        layout.addWidget(QLabel("选择图片"))
+        layout.addLayout(h_img)
+        self.btn_predict = QPushButton("开始预测")
+        layout.addWidget(self.btn_predict)
+        self.result_text = QTextEdit()
+        self.result_text.setReadOnly(True)
+        layout.addWidget(self.result_text)
+        layout.addStretch()
+        self.btn_predict.clicked.connect(self.predict)
+        self.predict_thread = None
+
+    def refresh_models(self):
+        self.model_combo.clear()
+        models = refresh_model_list()
+        self.model_combo.addItems(models)
+
+    def select_image(self):
+        path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.webp)")
+        if path:
+            self.img_path.setText(path)
+
+    def predict(self):
+        model_path = self.model_combo.currentText()
+        if not model_path:
+            self.result_text.append("请先训练模型")
+            return
+        model_type = get_model_type(model_path)
+        img_path = self.img_path.text().strip()
+        if not img_path or not os.path.exists(img_path):
+            self.result_text.append("请选择有效的图片")
+            return
+        env = os.environ.copy()
+        env["IS_SUBPROCESS"] = "1"
+        cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\" --img_path \"{img_path}\""
+        self.result_text.append("正在预测，请稍候...")
+        self.btn_predict.setEnabled(False)
+        self.predict_thread = PThread(cmd, env, capture_output=True)
+        def on_finish(result, error):
+            self.btn_predict.setEnabled(True)
+            if error:
+                self.result_text.append(f"图片预测失败：{error}")
+            else:
+                self.result_text.append(f"预测结果：\n{result.strip()}")
+        self.predict_thread.finished.connect(on_finish)
+        self.predict_thread.start()
+
+class PredictMultiImagePanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.model_checks = []
+        self.models = []
+        self.refresh_models()
+        self.img_path = QLineEdit()
+        self.img_path.setPlaceholderText("请选择图片")
+        btn_img = QPushButton("选择图片")
+        btn_img.clicked.connect(self.select_image)
+        h_img = QHBoxLayout()
+        h_img.addWidget(self.img_path)
+        h_img.addWidget(btn_img)
+        layout.addWidget(QLabel("选择模型（可多选）"))
+        self.models_layout = QVBoxLayout()
+        for cb in self.model_checks:
+            self.models_layout.addWidget(cb)
+        layout.addLayout(self.models_layout)
+        layout.addWidget(QLabel("选择图片"))
+        layout.addLayout(h_img)
+        self.btn_predict = QPushButton("开始多模型预测")
+        layout.addWidget(self.btn_predict)
+        self.result_text = QTextEdit()
+        self.result_text.setReadOnly(True)
+        layout.addWidget(self.result_text)
+        layout.addStretch()
+        self.btn_predict.clicked.connect(self.predict)
+        self.predict_threads = []
+    
+    def refresh_models(self):
+        # 清空旧的checkbox
+        self.models = refresh_model_list()
+        self.model_checks = []
+        if hasattr(self, "models_layout"):
+            while self.models_layout.count():
+                item = self.models_layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.deleteLater()
+        for m in self.models:
+            cb = QCheckBox(m)
+            self.model_checks.append(cb)
+            if hasattr(self, "models_layout"):
+                self.models_layout.addWidget(cb)
+
+    def select_image(self):
+        path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.webp)")
+        if path:
+            self.img_path.setText(path)
+
+    def predict(self):
+        selected = [cb.text() for cb in self.model_checks if cb.isChecked()]
+        if not selected:
+            self.result_text.append("请至少选择一个模型进行比较")
+            return
+        img_path = self.img_path.text().strip()
+        if not img_path or not os.path.exists(img_path):
+            self.result_text.append("请选择有效的图片")
+            return
+        model_types = [get_model_type(m) for m in selected]
+        self.result_text.append("正在进行多模型预测，请稍候...")
+        self.btn_predict.setEnabled(False)
+        self.multi_results = []
+        self.multi_predict_threads = []
+        self.finished_count = 0
+        def on_finish(idx):
+            def inner(result, error):
+                self.finished_count += 1
+                if error:
+                    self.multi_results.append(f"模型: {selected[idx]} ({model_types[idx]})\n预测失败：{error}\n{'-'*30}")
+                else:
+                    self.multi_results.append(f"模型: {selected[idx]} ({model_types[idx]})\n{result.strip()}\n{'-'*30}")
+                    # 写入日志
+                    with open(RESULT_LOG_FILE, 'a', encoding='utf-8') as f:
+                        f.write(
+                            f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n"
+                            f"预测模型: {selected[idx]}\n"
+                            f"模型类型: {model_types[idx]}\n"
+                            f"预测图片: {img_path}\n"
+                            f"预测结果:\n{result}\n"
+                            f"{'-'*40}\n"
+                        )
+                if self.finished_count == len(selected):
+                    self.result_text.append("\n".join(self.multi_results))
+                    self.btn_predict.setEnabled(True)
+            return inner
+        for idx, m in enumerate(selected):
+            env = os.environ.copy()
+            env["IS_SUBPROCESS"] = "1"
+            cmd = f"{sys.executable} photo_predict.py --model_path \"{m}\" --model_type \"{model_types[idx]}\" --img_path \"{img_path}\""
+            thread = PThread(cmd, env, capture_output=True)
+            thread.finished.connect(on_finish(idx))
+            self.multi_predict_threads.append(thread)
+            thread.start()
+
+class PredictVideoPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.model_combo = QComboBox()
+        self.refresh_models()
+        layout.addWidget(QLabel("选择模型"))
+        layout.addWidget(self.model_combo)
+        self.btn_predict = QPushButton("开始视频预测")
+        layout.addWidget(self.btn_predict)
+        self.result_text = QTextEdit()
+        self.result_text.setReadOnly(True)
+        layout.addWidget(self.result_text)
+        layout.addStretch()
+        self.btn_predict.clicked.connect(self.predict)
+        self.predict_thread = None
+
+    def refresh_models(self):
+        self.model_combo.clear()
+        models = refresh_model_list()
+        self.model_combo.addItems(models)
+
+    def predict(self):
+        model_path = self.model_combo.currentText()
+        if not model_path:
+            self.result_text.append("请先训练模型")
+            return
+        model_type = get_model_type(model_path)
+        env = os.environ.copy()
+        cmd = f"{sys.executable} video_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
+        self.result_text.append("正在视频预测，请稍候...")
+        self.btn_predict.setEnabled(False)
+        self.predict_thread = PThread(cmd, env, capture_output=False)
+        def on_finish(result, error):
+            self.btn_predict.setEnabled(True)
+            if error:
+                self.result_text.append(f"视频预测失败：{error}")
+            else:
+                self.result_text.append("视频预测已完成！")
+        self.predict_thread.finished.connect(on_finish)
+        self.predict_thread.start()
+
+class DedupPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.btn_dedup = QPushButton("自动去重数据集")
+        layout.addWidget(self.btn_dedup)
+        self.result_text = QTextEdit()
+        self.result_text.setReadOnly(True)
+        layout.addWidget(self.result_text)
+        layout.addStretch()
+        self.btn_dedup.clicked.connect(self.dedup)
+        self.dedup_thread = None
+
+    def dedup(self):
+        env = os.environ.copy()
+        cmd = f"{sys.executable} check_and_deduplicate_utkface.py"
+        self.result_text.append("正在去重，请稍候...")
+        self.btn_dedup.setEnabled(False)
+        self.dedup_thread = PThread(cmd, env, capture_output=False)
+        def on_finish(result, error):
+            self.btn_dedup.setEnabled(True)
+            if error:
+                self.result_text.append(f"数据集去重失败：{error}")
+            else:
+                self.result_text.append("数据集去重已完成。")
+        self.dedup_thread.finished.connect(on_finish)
+        self.dedup_thread.start()
+
+class DeleteModelPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.model_combo = QComboBox()
+        self.refresh_models()
+        layout.addWidget(QLabel("选择要删除的模型"))
+        layout.addWidget(self.model_combo)
+        self.confirm_edit = QLineEdit()
+        self.confirm_edit.setPlaceholderText("再次输入模型名以确认删除")
+        layout.addWidget(self.confirm_edit)
+        self.btn_delete = QPushButton("删除模型")
+        layout.addWidget(self.btn_delete)
+        self.result_text = QTextEdit()
+        self.result_text.setReadOnly(True)
+        layout.addWidget(self.result_text)
+        layout.addStretch()
+        self.btn_delete.clicked.connect(self.delete_model)
+
+    def refresh_models(self):
+        self.model_combo.clear()
+        models = refresh_model_list()
+        self.model_combo.addItems(models)
+
+    def delete_model(self):
+        model = self.model_combo.currentText()
+        confirm = self.confirm_edit.text().strip()
+        if not model:
+            self.result_text.append("暂无模型文件")
+            return
+        if confirm != model:
+            self.result_text.append("模型名称输入错误，未删除任何文件。")
+            return
+        try:
+            os.remove(model)
+            if os.path.exists(MODELS_INFO_FILE):
+                with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+                    info = json.load(f)
+                if model in info:
+                    del info[model]
+                    with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
+                        json.dump(info, f, ensure_ascii=False, indent=2)
+            self.result_text.append(f"模型 {model} 已成功删除。")
+            self.confirm_edit.clear()
+            self.refresh_models()
+        except Exception as e:
+            self.result_text.append(f"删除失败：{e}")
+
+class LogPanel(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setContentsMargins(20, 20, 20, 20)
+        layout = QVBoxLayout(self)
+        self.log_text = QTextEdit()
+        self.log_text.setReadOnly(True)
+        layout.addWidget(QLabel("结果日志"))
+        layout.addWidget(self.log_text)
+        self.refresh_btn = QPushButton("刷新")
+        layout.addWidget(self.refresh_btn)
+        layout.addStretch()
+        self.refresh_btn.clicked.connect(self.refresh)
+        self.refresh()
+
+    def refresh(self):
+        if os.path.exists(RESULT_LOG_FILE):
+            with open(RESULT_LOG_FILE, 'r', encoding='utf-8') as f:
+                self.log_text.setText(f.read())
+        else:
+            self.log_text.setText("暂无日志。")
+
+class MainPanelWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("年龄性别识别系统")
-        self.setGeometry(200, 200, 1000, 700)
+        self.setGeometry(200, 200, 1200, 800)
         self.current_theme = "light"
+        main_layout = QHBoxLayout(self)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        btn_train = QPushButton("训练模型")
-        btn_train.clicked.connect(self.train_model)
-        layout.addWidget(btn_train)
-
-        btn_view = QPushButton("查看训练模型")
-        btn_view.clicked.connect(self.view_models)
-        layout.addWidget(btn_view)
-
-        btn_predict = QPushButton("图片预测")
-        btn_predict.clicked.connect(self.predict_image)
-        layout.addWidget(btn_predict)
-
-        btn_multi = QPushButton("多模型图片比较")
-        btn_multi.clicked.connect(self.predict_image_multi)
-        layout.addWidget(btn_multi)
-
-        btn_video = QPushButton("视频预测")
-        btn_video.clicked.connect(self.predict_video)
-        layout.addWidget(btn_video)
-
-        btn_dedup = QPushButton("数据集自动去重")
-        btn_dedup.clicked.connect(self.deduplicate_dataset)
-        layout.addWidget(btn_dedup)
-
-        btn_delete = QPushButton("删除训练模型")
-        btn_delete.clicked.connect(self.delete_model)
-        layout.addWidget(btn_delete)
-
-        btn_log = QPushButton("查看结果日志")
-        btn_log.clicked.connect(self.view_log)
-        layout.addWidget(btn_log)
-
-        hbox = QHBoxLayout()
-        btn_exit = QPushButton("退出")
-        btn_exit.clicked.connect(self.close)
-        hbox.addWidget(btn_exit)
-        hbox.addStretch()
+        menu_layout = QVBoxLayout()
+        menu_layout.setContentsMargins(10, 10, 10, 10)
+        menu_layout.setSpacing(10)
+        self.btn_train = QPushButton("训练模型")
+        self.btn_models = QPushButton("查看模型")
+        self.btn_predict_img = QPushButton("图片预测")
+        self.btn_predict_multi_img = QPushButton("多模型图片预测")
+        self.btn_predict_video = QPushButton("视频预测")
+        self.btn_dedup = QPushButton("数据集去重")
+        self.btn_delete = QPushButton("删除模型")
+        self.btn_log = QPushButton("查看日志")
         self.btn_theme = QPushButton()
         self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
         self.btn_theme.setIconSize(QSize(28, 28))
         self.btn_theme.setFixedSize(36, 36)
         self.btn_theme.setStyleSheet("border:none; background:transparent;")
         self.btn_theme.setToolTip("昼夜切换")
+        menu_layout.addWidget(self.btn_train)
+        menu_layout.addWidget(self.btn_models)
+        menu_layout.addWidget(self.btn_predict_img)
+        menu_layout.addWidget(self.btn_predict_multi_img)
+        menu_layout.addWidget(self.btn_predict_video)
+        menu_layout.addWidget(self.btn_dedup)
+        menu_layout.addWidget(self.btn_delete)
+        menu_layout.addWidget(self.btn_log)
+        menu_layout.addStretch()
+        menu_layout.addWidget(self.btn_theme)
+        for btn in [
+            self.btn_train, self.btn_models, self.btn_predict_img, self.btn_predict_multi_img,
+            self.btn_predict_video, self.btn_dedup, self.btn_delete, self.btn_log
+        ]:
+            btn.setObjectName("menuButton")
+
+        self.stack = QStackedWidget()
+        self.train_panel = TrainPanel()
+        self.model_list_panel = ModelListPanel()
+        self.predict_img_panel = PredictImagePanel()
+        self.predict_multi_img_panel = PredictMultiImagePanel()
+        self.predict_video_panel = PredictVideoPanel()
+        self.dedup_panel = DedupPanel()
+        self.delete_panel = DeleteModelPanel()
+        self.log_panel = LogPanel()
+        self.stack.addWidget(self.train_panel)
+        self.stack.addWidget(self.model_list_panel)
+        self.stack.addWidget(self.predict_img_panel)
+        self.stack.addWidget(self.predict_multi_img_panel)
+        self.stack.addWidget(self.predict_video_panel)
+        self.stack.addWidget(self.dedup_panel)
+        self.stack.addWidget(self.delete_panel)
+        self.stack.addWidget(self.log_panel)
+        main_layout.addLayout(menu_layout, 1)
+        main_layout.addWidget(self.stack, 4)
+
+        self.current_panel_idx = 0
+        self.btn_train.clicked.connect(lambda: self.switch_panel(0))
+        self.btn_models.clicked.connect(lambda: (self.model_list_panel.refresh(), self.switch_panel(1)))
+        self.btn_predict_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(2)))
+        self.btn_predict_multi_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(3)))
+        self.btn_predict_video.clicked.connect(lambda: (self.predict_video_panel.refresh_models(), self.switch_panel(4)))
+        self.btn_dedup.clicked.connect(lambda: self.switch_panel(5))
+        self.btn_delete.clicked.connect(lambda: (self.delete_panel.refresh_models(), self.switch_panel(6)))
+        self.btn_log.clicked.connect(lambda: (self.log_panel.refresh(), self.switch_panel(7)))
         self.btn_theme.clicked.connect(self.toggle_theme)
-        hbox.addWidget(self.btn_theme)
-        layout.addLayout(hbox)
+        self.switch_panel(0)
 
-        self.setLayout(layout)
-
-    def train_model(self):
-        dlg = TrainDialog(self)
-        if dlg.exec() == QDialog.Accepted:
-            if os.path.exists(STOP_FLAG_FILE):
-                os.remove(STOP_FLAG_FILE)
-            params = dlg.get_params()
-            if not params:
-                return
-            cmd = (f"{sys.executable} train_age_gender_multitask.py "
-                f"--batch_size {params[0]} --epochs {params[1]} --lr {params[2]} "
-                f"--img_size {params[3]} --data_dir \"{params[4]}\" --model_type \"{params[5]}\" --model_path \"{params[6]}\"")
-            env = os.environ.copy()
-            log_dlg = QDialog(self)
-            log_dlg.setWindowTitle("训练进度")
-            log_dlg.setWindowFlags(log_dlg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            vbox = QVBoxLayout()
-            progress_bar = QProgressBar()
-            progress_bar.setRange(0, 100)
-            vbox.addWidget(progress_bar)
-            tqdm_label = QLabel()
-            tqdm_label.setText(" ")
-            vbox.addWidget(tqdm_label)
-            log_text = QTextEdit()
-            log_text.setReadOnly(True)
-            vbox.addWidget(log_text)
-            btn_stop = QPushButton("停止训练")
-            vbox.addWidget(btn_stop)
-            log_dlg.setLayout(vbox)
-            self.train_thread = TrainThread(cmd, env)
-            def log_filter(text):
-                if "|" in text and "%" in text:
-                    tqdm_label.setText(text.rstrip())
-                else:
-                    log_text.append(text.rstrip())
-                    log_text.moveCursor(QTextCursor.End)
-            self.train_thread.log_signal.connect(log_filter)
-            self.train_thread.progress_signal.connect(progress_bar.setValue)
-            def on_finish(error):
-                btn_stop.setEnabled(False)
-                if error:
-                    msg = QMessageBox(QMessageBox.Critical, "训练失败", f"模型训练失败：{error}", parent=self)
-                    msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                    msg.exec_()
-                else:
-                    if os.path.exists(params[6]):
-                        try:
-                            if os.path.exists(MODELS_INFO_FILE):
-                                with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
-                                    info = json.load(f)
-                            else:
-                                info = {}
-                            info[params[6]] = params[5]
-                            with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
-                                json.dump(info, f, ensure_ascii=False, indent=2)
-                        except Exception as e:
-                            msg = QMessageBox(QMessageBox.Warning, "模型信息写入失败", str(e), parent=self)
-                            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                            msg.exec_()
-                        msg = QMessageBox(QMessageBox.Information, "训练完成", "模型训练完成！", parent=self)
-                        msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                        msg.exec_()
-                    else:
-                        msg = QMessageBox(QMessageBox.Critical, "训练中断", "模型保存失败！请启动命令行开发者模式，排查原因。", parent=self)
-                        msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                        msg.exec_()
-                log_dlg.accept()
-            self.train_thread.finished.connect(on_finish)
-            btn_stop.clicked.connect(self.train_thread.stop)
-            self.train_thread.start()
-            log_dlg.exec_()
-
-    def view_models(self):
-        models = refresh_model_list()
-        dlg = QDialog(self)
-        dlg.setWindowTitle("已训练模型列表")
-        dlg.setWindowFlags(dlg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        vbox = QVBoxLayout()
-        if not models:
-            vbox.addWidget(QLabel("暂无模型文件"))
-        else:
-            for m in models:
-                vbox.addWidget(QLabel(m))
-        dlg.setLayout(vbox)
-        dlg.exec_()
-
-    def predict_image(self):
-        model_path = self.select_model()
-        if not model_path:
-            return
-        model_type = get_model_type(model_path)
-        img_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.webp)")
-        if not img_path:
-            return
-        env = os.environ.copy()
-        env["IS_SUBPROCESS"] = "1"
-        cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\" --img_path \"{img_path}\""
-        progress = QProgressDialog("正在预测，请稍候...", None, 0, 0, self)
-        progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        progress.setWindowTitle("提示")
-        progress.setWindowModality(Qt.ApplicationModal)
-        progress.setCancelButton(None)
-        progress.show()
-        QApplication.processEvents()
-        self.predict_thread = PThread(cmd, env, capture_output=True)
-        def on_finish(result, error):
-            progress.close()
-            if error:
-                msg = QMessageBox(QMessageBox.Critical, "错误", f"图片预测失败：{error}", parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-            else:
-                msg = QMessageBox(QMessageBox.Information, "预测完成", f"图片预测已完成！\n\n{result.strip()}", parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-        self.predict_thread.finished.connect(on_finish)
-        self.predict_thread.start()
-
-    def predict_image_multi(self):
-        models = refresh_model_list()
-        if not models:
-            msg = QMessageBox(QMessageBox.Information, "提示", "请先训练模型", parent=self)
-            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            msg.exec_()
-            return
-        dlg = QDialog(self)
-        dlg.setWindowFlags(dlg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        dlg.setWindowTitle("选择多个模型")
-        vbox = QVBoxLayout()
-        check = []
-        for m in models:
-            cb = QCheckBox(m)
-            vbox.addWidget(cb)
-            check.append(cb)
-        btn_ok = QPushButton("开始比较")
-        vbox.addWidget(btn_ok)
-        dlg.setLayout(vbox)
-        def on_ok():
-            selected = [cb.text() for cb in check if cb.isChecked()]
-            if not selected:
-                msg = QMessageBox(QMessageBox.Information, "提示", "请至少选择一个模型进行比较", parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-                return
-            if len(selected) > len(models):
-                msg = QMessageBox(QMessageBox.Warning, "提示", f"最多只能选择{len(models)}个模型进行比较", parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-                return
-            dlg.accept()
-            img_path, _ = QFileDialog.getOpenFileName(self, "选择图片", "", "Images (*.png *.jpg *.jpeg *.bmp *.tiff *.webp)")
-            if not img_path:
-                return
-            model_types = [get_model_type(m) for m in selected]
-            progress = QProgressDialog("正在进行多模型预测，请稍候...", None, 0, len(selected), self)
-            progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            progress.setWindowTitle("提示")
-            progress.setWindowModality(Qt.ApplicationModal)
-            progress.setCancelButton(None)
-            progress.show()
-            QApplication.processEvents()
-            self.multi_results = []
-            self.multi_errors = []
-            self.multi_predict_threads = []
-            def run_next(idx = 0):
-                if idx >= len(selected):
-                    progress.close()
-                    all_results = ""
-                    for i, m in enumerate(selected):
-                        out = self.multi_results[i] if i < len(self.multi_results) else ""
-                        all_results += f"模型: {m} ({model_types[i]})\n{out.strip()}\n{'-'*30}\n"
-                    msg = QMessageBox(QMessageBox.Information, "多模型预测完成", f"多模型预测已完成，详细结果如下：\n\n{all_results.strip()}\n\n详细结果请查看 {RESULT_LOG_FILE}", parent=self)
-                    msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                    msg.exec_()
-                    return
-                m = selected[idx]
-                env = os.environ.copy()
-                env["IS_SUBPROCESS"] = "1"
-                cmd = f"{sys.executable} photo_predict.py --model_path \"{m}\" --model_type \"{model_types[idx]}\" --img_path \"{img_path}\""
-                predict_thread = PThread(cmd, env, capture_output=True)
-                def on_finish(result, error):
-                    progress.setValue(idx + 1)
-                    if error:
-                        self.multi_results.append(f"预测失败：{error}")
-                    else:
-                        self.multi_results.append(result)
-                        with open(RESULT_LOG_FILE, 'a', encoding='utf-8') as f:
-                            f.write(
-                                f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n"
-                                f"预测模型: {m}\n"
-                                f"模型类型: {model_types[idx]}\n"
-                                f"预测图片: {img_path}\n"
-                                f"预测结果:\n{result}\n"
-                                f"{'-'*40}\n"
-                            )
-                    run_next(idx + 1)
-                self.multi_predict_threads.append(predict_thread)
-                predict_thread.finished.connect(on_finish)
-                predict_thread.start()
-            run_next(0)
-        btn_ok.clicked.connect(on_ok)
-        dlg.exec_()
-
-    def predict_video(self):
-        model_path = self.select_model()
-        if not model_path:
-            return
-        model_type = get_model_type(model_path)
-        env = os.environ.copy()
-        cmd = f"{sys.executable} video_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
-        progress = QProgressDialog("正在视频预测，请稍候...", None, 0, 0, self)
-        progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        progress.setWindowTitle("提示")
-        progress.setWindowModality(Qt.ApplicationModal)
-        progress.setCancelButton(None)
-        progress.show()
-        QApplication.processEvents()
-        self.predict_thread = PThread(cmd, env, capture_output=False)
-        def on_finish(result, error):
-            progress.close()
-            if error:
-                msg = QMessageBox(QMessageBox.Critical, "错误", f"视频预测失败：{error}", parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-            else:
-                msg = QMessageBox(QMessageBox.Information, "完成", "视频预测已完成！", parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-        self.predict_thread.finished.connect(on_finish)
-        self.predict_thread.start()
-
-    def deduplicate_dataset(self):
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Question)
-        msg.setWindowTitle("确认去重")
-        msg.setText("是否自动去重数据集？\n注意：此操作会删除重复图片，且不可恢复！")
-        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        reply = msg.exec_()
-        if reply == QMessageBox.Yes:
-            env = os.environ.copy()
-            cmd = f"{sys.executable} check_and_deduplicate_utkface.py"
-            progress = QProgressDialog("正在去重，请稍候...", None, 0, 0, self)
-            progress.setWindowFlags(progress.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            progress.setWindowTitle("提示")
-            progress.setWindowModality(Qt.ApplicationModal)
-            progress.setCancelButton(None)
-            progress.show()
-            QApplication.processEvents()
-            self.dedup_thread = PThread(cmd, env, capture_output=False)
-            def on_finish(result, error):
-                progress.close()
-                if error:
-                    msg = QMessageBox(QMessageBox.Critical, "错误", f"数据集去重失败：{error}", parent=self)
-                    msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                    msg.exec_()
-                else:
-                    msg = QMessageBox(QMessageBox.Information, "完成", "数据集去重已完成。", parent=self)
-                    msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                    msg.exec_()
-            self.dedup_thread.finished.connect(on_finish)
-            self.dedup_thread.start()
-
-    def delete_model(self):
-        models = refresh_model_list()
-        if not models:
-            msg = QMessageBox(QMessageBox.Information, "提示", "暂无模型文件", parent=self)
-            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            msg.exec_()
-            return
-        model, ok = QInputDialog.getItem(self, "删除模型", "请选择要删除的模型：", models, 0, False)
-        if not ok or not model:
-            return
-        confirm, ok = QInputDialog.getText(self, "确认删除", f"请再次输入模型文件名以确认删除：")
-        if not ok or confirm != model:
-            msg = QMessageBox(QMessageBox.Information, "提示", "模型名称输入错误，未删除任何文件。", parent=self)
-            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            msg.exec_()
-            return
-        msg = QMessageBox(self)
-        msg.setIcon(QMessageBox.Question)
-        msg.setWindowTitle("确认")
-        msg.setText(f"即将永久删除模型 {model}，确定删除？")
-        msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-        msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        reply = msg.exec_()
-        if reply == QMessageBox.Yes:
-            os.remove(model)
-            try:
-                if os.path.exists(MODELS_INFO_FILE):
-                    with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
-                        info = json.load(f)
-                    if model in info:
-                        del info[model]
-                        with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
-                            json.dump(info, f, ensure_ascii=False, indent=2)
-            except Exception as e:
-                msg = QMessageBox(QMessageBox.Warning, "模型信息更新失败", str(e), parent=self)
-                msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-                msg.exec_()
-            msg = QMessageBox(QMessageBox.Information, "完成", f"模型 {model} 已成功删除。", parent=self)
-            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            msg.exec_()
-        
-    def view_log(self):
-        dlg = QDialog(self)
-        dlg.setWindowFlags(dlg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        dlg.setWindowTitle("结果日志")
-        vbox = QVBoxLayout()
-        txt = QTextEdit()
-        txt.setReadOnly(True)
-        if os.path.exists(RESULT_LOG_FILE):
-            with open(RESULT_LOG_FILE, 'r', encoding='utf-8') as f:
-                txt.setText(f.read())
-        else:
-            txt.setText("暂无日志。")
-        vbox.addWidget(txt)
-        dlg.setLayout(vbox)
-        dlg.resize(800, 600)
-        dlg.exec_()
-
-    def select_model(self):
-        models = refresh_model_list()
-        if not models:
-            msg = QMessageBox(QMessageBox.Information, "提示", "暂无模型文件", parent=self)
-            msg.setWindowFlags(msg.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-            msg.exec_()
-            return None
-        model, ok = QInputDialog.getItem(self, "选择模型", "请选择模型：", models, 0, False)
-        return model if ok else None
+    def switch_panel(self, idx):
+        if idx != self.current_panel_idx:
+            if idx == 0:
+                self.train_panel.log_text.clear()
+            elif idx == 2:
+                self.predict_img_panel.result_text.clear()
+            elif idx == 3:
+                self.predict_multi_img_panel.result_text.clear()
+            elif idx == 4:
+                self.predict_video_panel.result_text.clear()
+            elif idx == 5:
+                self.dedup_panel.result_text.clear()
+            elif idx == 6:
+                self.delete_panel.result_text.clear()
+        self.stack.setCurrentIndex(idx)
+        self.current_panel_idx = idx
 
     def toggle_theme(self):
         app = QApplication.instance()
@@ -559,7 +626,8 @@ class MainWindow(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setStyle("Fusion")
     load_qss(app, LIGHT_QSS_FILE)
-    window = MainWindow()
+    window = MainPanelWindow()
     window.show()
     sys.exit(app.exec_())
