@@ -1,0 +1,43 @@
+QWidget {
+    background: #f7f7f7;
+    color: #222;
+    font-family: '微软雅黑', Arial, sans-serif;
+    font-size: 15px;
+}
+QPushButton {
+    background-color: #409EFF;
+    color: white;
+    border-radius: 16px;
+    padding: 10px 18px;
+    border: none;
+    margin: 6px 0;
+}
+QPushButton:hover {
+    background-color: #66b1ff;
+}
+QPushButton:pressed {
+    background-color: #337ecc;
+}
+QProgressBar {
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    text-align: center;
+    height: 20px;
+    background: #eaeaea;
+}
+QProgressBar::chunk {
+    background-color: #67C23A;
+    border-radius: 8px;
+}
+QDialog, QMessageBox {
+    background: #f7f7f7;
+}
+QLineEdit, QTextEdit {
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 4px;
+}
+QCheckBox {
+    spacing: 8px;
+}

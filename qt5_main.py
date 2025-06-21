@@ -6,14 +6,16 @@ import subprocess
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QPushButton, QVBoxLayout, QProgressBar, QLabel, QFileDialog,
     QMessageBox, QInputDialog, QTextEdit, QDialog, QCheckBox, QProgressDialog,
-    QFormLayout, QLineEdit
+    QFormLayout, QLineEdit, QHBoxLayout, QComboBox
 )
-from PyQt5.QtGui import QTextCursor
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QTextCursor, QIcon
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 
 RESULT_LOG_FILE = 'result_log.log'
 MODELS_INFO_FILE = 'data/models.json'
 STOP_FLAG_FILE = os.path.abspath("stop.flag")
+LIGHT_QSS_FILE = 'assets/light.qss'
+DARK_QSS_FILE = 'assets/dark.qss'
 
 def refresh_model_list():
     return [f for f in os.listdir('.') if f.endswith('.pth')]
@@ -28,6 +30,10 @@ def get_model_type(model_path):
     types = ['resnet18', 'resnet34', 'resnet50']
     t, ok = QInputDialog.getItem(None, "模型类型", "请选择模型类型：", types, 0, False)
     return t if ok else types[0]
+
+def load_qss(app, qss_file):
+    with open(qss_file, encoding='utf-8') as f:
+        app.setStyleSheet(f.read())
 
 class PThread(QThread):
     finished = pyqtSignal(str, object)
@@ -99,14 +105,21 @@ class TrainDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("训练模型参数")
-        self.labels = ["Batch size", "Epochs", "Learning rate", "Image size", "数据集目录", "模型类型(resnet18/resnet34/resnet50)", "模型保存路径"]
+        self.labels = ["Batch size", "Epochs", "Learning rate", "Image size", "数据集目录", "模型类型", "模型保存路径"]
         self.defaults = [64, 10, 1e-3, 224, 'data/UTKFace/cleaned', 'resnet18', 'age_gender_multitask_resnet18.pth']
         self.edits = []
         layout = QFormLayout()
-        for label, default in zip(self.labels, self.defaults):
-            edit = QLineEdit(str(default))
-            layout.addRow(label, edit)
-            self.edits.append(edit)
+        for idx, (label, default) in enumerate(zip(self.labels, self.defaults)):
+            if label == "模型类型":
+                combo = QComboBox()
+                combo.addItems(['resnet18', 'resnet34', 'resnet50'])
+                combo.setCurrentText(str(default))
+                layout.addRow(label, combo)
+                self.edits.append(combo)
+            else:
+                edit = QLineEdit(str(default))
+                layout.addRow(label, edit)
+                self.edits.append(edit)
         btn_ok = QPushButton("确定")
         btn_ok.clicked.connect(self.validate_and_accept)
         layout.addRow(btn_ok)
@@ -143,13 +156,16 @@ class TrainDialog(QDialog):
         if not values[6].lower().endswith('.pth'):
             values[6] += '.pth'
         return values
-    
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("年龄性别识别系统")
-        self.setGeometry(200, 200, 420, 600)
-        layout = QVBoxLayout()
+        self.setGeometry(200, 200, 1000, 700)
+        self.current_theme = "light"
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         btn_train = QPushButton("训练模型")
         btn_train.clicked.connect(self.train_model)
@@ -183,9 +199,20 @@ class MainWindow(QWidget):
         btn_log.clicked.connect(self.view_log)
         layout.addWidget(btn_log)
 
+        hbox = QHBoxLayout()
         btn_exit = QPushButton("退出")
         btn_exit.clicked.connect(self.close)
-        layout.addWidget(btn_exit)
+        hbox.addWidget(btn_exit)
+        hbox.addStretch()
+        self.btn_theme = QPushButton()
+        self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
+        self.btn_theme.setIconSize(QSize(28, 28))
+        self.btn_theme.setFixedSize(36, 36)
+        self.btn_theme.setStyleSheet("border:none; background:transparent;")
+        self.btn_theme.setToolTip("昼夜切换")
+        self.btn_theme.clicked.connect(self.toggle_theme)
+        hbox.addWidget(self.btn_theme)
+        layout.addLayout(hbox)
 
         self.setLayout(layout)
 
@@ -259,7 +286,7 @@ class MainWindow(QWidget):
             btn_stop.clicked.connect(self.train_thread.stop)
             self.train_thread.start()
             log_dlg.exec_()
-    
+
     def view_models(self):
         models = refresh_model_list()
         dlg = QDialog(self)
@@ -418,7 +445,7 @@ class MainWindow(QWidget):
                 msg.exec_()
         self.predict_thread.finished.connect(on_finish)
         self.predict_thread.start()
-            
+
     def deduplicate_dataset(self):
         msg = QMessageBox(self)
         msg.setIcon(QMessageBox.Question)
@@ -518,9 +545,21 @@ class MainWindow(QWidget):
             return None
         model, ok = QInputDialog.getItem(self, "选择模型", "请选择模型：", models, 0, False)
         return model if ok else None
-    
+
+    def toggle_theme(self):
+        app = QApplication.instance()
+        if self.current_theme == "light":
+            load_qss(app, DARK_QSS_FILE)
+            self.btn_theme.setIcon(QIcon("assets/svg/sun.svg"))
+            self.current_theme = "dark"
+        else:
+            load_qss(app, LIGHT_QSS_FILE)
+            self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
+            self.current_theme = "light"
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    load_qss(app, LIGHT_QSS_FILE)
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
