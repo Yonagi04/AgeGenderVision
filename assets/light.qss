@@ -2,22 +2,30 @@ QWidget {
     background: #f7f7f7;
     color: #222;
     font-family: '微软雅黑', Arial, sans-serif;
-    font-size: 15px;
+    font-size: 18px;
 }
+
 QPushButton {
-    background-color: #409EFF;
-    color: white;
-    border-radius: 16px;
+    background-color: #f4f4f5;
+    color: #222;
+    border-radius: 10px;
     padding: 10px 18px;
-    border: none;
+    border: 1px solid #d1d5db;
     margin: 6px 0;
+    font-size: 16px;
+    font-family: '微软雅黑', Arial, sans-serif;
 }
 QPushButton:hover {
-    background-color: #66b1ff;
+    background-color: #dbeafe;
+    color: #2563eb;
+    border: 1px solid #2563eb;
 }
 QPushButton:pressed {
-    background-color: #337ecc;
+    background-color: #2563eb;
+    color: #fff;
+    border: 1px solid #2563eb;
 }
+
 QProgressBar {
     border: 1px solid #bbb;
     border-radius: 8px;
@@ -25,19 +33,88 @@ QProgressBar {
     height: 20px;
     background: #eaeaea;
 }
+
 QProgressBar::chunk {
     background-color: #67C23A;
     border-radius: 8px;
 }
-QDialog, QMessageBox {
-    background: #f7f7f7;
-}
+
 QLineEdit, QTextEdit {
     border: 1px solid #bbb;
     border-radius: 8px;
     background: #fff;
     padding: 4px;
 }
+
 QCheckBox {
     spacing: 8px;
+}
+
+QComboBox {
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    background: #fff;
+    padding: 4px 8px;
+    min-width: 80px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    background: transparent;
+}
+
+QComboBox QAbstractItemView {
+    border: 1px solid #bbb;
+    background: #fff;
+    selection-background-color: #e6f7ff;
+    selection-color: #222;
+}
+
+QStackedWidget {
+    background: rgba(255,255,255,0.97);
+    border-radius: 22px;
+    border: 1px solid #e5e7eb;
+    padding: 32px;
+}
+
+QPushButton#menuButton {
+    background-color: #f3f4f6;
+    color: #222;
+    border-radius: 12px;
+    min-height: 40px;
+    font-size: 17px;
+    font-family: '微软雅黑', Arial, sans-serif;
+    padding-left: 18px;
+    padding-right: 18px;
+    margin: 6px 0;
+}
+
+QPushButton#menuButton:hover {
+    background-color: #dbeafe;
+    color: #2563eb;
+}
+
+QPushButton#menuButton:pressed {
+    background-color: #2563eb;
+    color: #fff;
+}
+
+QStackedWidget > QWidget,
+QStackedWidget > QWidget > QWidget,
+QStackedWidget QTextEdit,
+QStackedWidget QLineEdit,
+QStackedWidget QLabel,
+QStackedWidget QComboBox,
+QStackedWidget QCheckBox {
+    background: transparent;
+}
+
+QDialog, QMessageBox {
+    background: #f7f7f7 !important;
+    color: #222 !important;
+}
+
+QMessageBox QLabel, QMessageBox QTextEdit {
+    background: transparent !important;
+    color: #222 !important;
 }
