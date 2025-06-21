@@ -112,6 +112,7 @@ RuntimeError: Error(s) in loading state_dict for MultiTaskResNet:
 ## 致谢
 - [UTKFace Dataset](https://susanqq.github.io/UTKFace/)
 - [PyTorch](https://pytorch.org/)
+- [Ultralytics](https://github.com/ultralytics/ultralytics)
 
 ---
 如有问题欢迎提 issue 或联系作者，觉得做得不错的话，就点个 Star 支持一下作者吧。

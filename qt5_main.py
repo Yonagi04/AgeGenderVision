@@ -35,6 +35,7 @@ def load_qss(app, qss_file):
 class TrainThread(QThread):
     log_signal = pyqtSignal(str)
     progress_signal = pyqtSignal(int)
+    tqdm_signal = pyqtSignal(int, int)
     finished = pyqtSignal(object)
 
     def __init__(self, cmd, env):
@@ -45,6 +46,7 @@ class TrainThread(QThread):
 
     def run(self):
         import subprocess
+        import re
         try:
             self._process = subprocess.Popen(
                 self.cmd, shell=True, env=self.env,
@@ -54,9 +56,7 @@ class TrainThread(QThread):
             epoch = 0
             total_epochs = None
             for line in self._process.stdout:
-                self.log_signal.emit(line)
                 if "Epoch" in line:
-                    import re
                     m = re.search(r"Epoch\s+(\d+)/(\d+)", line)
                     if m:
                         epoch = int(m.group(1))
@@ -64,6 +64,14 @@ class TrainThread(QThread):
                         if total_epochs:
                             percent = int(epoch / total_epochs * 100)
                             self.progress_signal.emit(percent)
+                if "|" in line and "it/s" in line:
+                    tqdm_match = re.search(r'(\d+)\s*/\s*(\d+)', line)
+                    if tqdm_match:
+                        current = int(tqdm_match.group(1))
+                        total = int(tqdm_match.group(2))
+                        self.tqdm_signal.emit(current, total)
+                        continue
+                self.log_signal.emit(line)
                 if os.path.exists(STOP_FLAG_FILE):
                     self._process.terminate()
                     break
@@ -129,6 +137,11 @@ class TrainPanel(QWidget):
         self.progress = QProgressBar()
         self.progress.setRange(0, 100)
         layout.addWidget(self.progress)
+        self.tqdm_label = QLabel("训练进度：0/0")
+        self.tqdm_bar = QProgressBar()
+        self.tqdm_bar.setRange(0, 100)
+        layout.addWidget(self.tqdm_label)
+        layout.addWidget(self.tqdm_bar)
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         layout.addWidget(self.log_text)
@@ -159,6 +172,8 @@ class TrainPanel(QWidget):
             return
         if os.path.exists(STOP_FLAG_FILE):
             os.remove(STOP_FLAG_FILE)
+        self.tqdm_label.setText("训练进度：0/0")
+        self.tqdm_bar.setValue(0)
         cmd = (f"{sys.executable} train_age_gender_multitask.py "
                f"--batch_size {batch_size} --epochs {epochs} --lr {lr} "
                f"--img_size {img_size} --data_dir \"{data_dir}\" --model_type \"{model_type}\" --model_path \"{model_path}\"")
@@ -170,6 +185,14 @@ class TrainPanel(QWidget):
         self.train_thread = TrainThread(cmd, env)
         self.train_thread.log_signal.connect(self.log_text.append)
         self.train_thread.progress_signal.connect(self.progress.setValue)
+        def update_tqdm(current, total):
+            self.tqdm_label.setText(f"训练进度：{current}/{total}")
+            if total > 0:
+                percent = int(current / total * 100)
+                self.tqdm_bar.setValue(percent)
+            else:
+                self.tqdm_bar.setValue(0)
+        self.train_thread.tqdm_signal.connect(update_tqdm)
         def on_finish(error):
             self.btn_train.setEnabled(True)
             self.btn_stop.setEnabled(False)
