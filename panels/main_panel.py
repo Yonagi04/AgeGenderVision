@@ -39,7 +39,6 @@ class MainPanelWindow(QWidget):
         self.btn_theme.setIconSize(QSize(28, 28))
         self.btn_theme.setFixedSize(36, 36)
         self.btn_theme.setStyleSheet("border:none; background:transparent;")
-        self.btn_theme.setToolTip("昼夜切换")
         menu_layout.addWidget(self.btn_train)
         menu_layout.addWidget(self.btn_models)
         menu_layout.addWidget(self.btn_predict_img)
@@ -80,7 +79,7 @@ class MainPanelWindow(QWidget):
         self.btn_predict_multi_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(3)))
         self.btn_predict_video.clicked.connect(lambda: (self.predict_video_panel.refresh_models(), self.switch_panel(4)))
         self.btn_dedup.clicked.connect(lambda: self.switch_panel(5))
-        self.btn_log.clicked.connect(lambda: (self.log_panel.refresh(), self.switch_panel(7)))
+        self.btn_log.clicked.connect(lambda: (self.log_panel.refresh(), self.switch_panel(6)))
         self.btn_theme.clicked.connect(self.toggle_theme)
         self.switch_panel(0)
 
