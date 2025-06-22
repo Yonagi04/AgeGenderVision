@@ -3,13 +3,22 @@ import sys
 import traceback
 import datetime
 import shutil
+import signal
 from collections import defaultdict
 
 LOG_FILE = 'error_log.log'
+STOP_FLAG_FILE = os.path.abspath("stop.flag")
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
     DEVELOPER_MODE = True
 else:
     DEVELOPER_MODE = os.environ.get("DEVELOPER_MODE", "0") == "1"
+
+def dummy_handler(signum, frame):
+    print("非命令行环境下，屏蔽Ctrl+C（KeyboardInterrupt），请通过UI停止去重。")
+
+is_tty = sys.stdout.isatty()
+if not is_tty:
+    signal.signal(signal.SIGINT, dummy_handler)
 
 def save_error_log(e):
     if DEVELOPER_MODE:
@@ -40,10 +49,12 @@ def main():
     name_to_path = dict()
     duplicate_count = 0
 
-
-
     # 遍历所有文件夹，收集图片
     for folder in folders:
+        if os.path.exists(STOP_FLAG_FILE):
+            print("\n检测到停止标志，提前结束收集，直接进入整理流程。")
+            os.remove(STOP_FLAG_FILE)
+            break
         if not os.path.exists(folder):
             continue
         for fname in os.listdir(folder):
