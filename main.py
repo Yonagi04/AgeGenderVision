@@ -6,6 +6,7 @@ import datetime
 import traceback
 import argparse
 import json
+import shutil
 from tkinter import filedialog
 
 parser = argparse.ArgumentParser()
@@ -16,35 +17,60 @@ DEVELOPER_MODE = args.dev
 ERROR_LOG_FILE = 'error_log.log'
 RESULE_LOG_FILE = 'result_log.log'
 MODELS_INFO_FILE = 'data/models.json'
+MODEL_DIR_FLAG = 'data/last_model_dir.txt'
 
 def list_models():
     print("当前已训练模型：")
-    models = [f for f in os.listdir('.') if f.endswith('.pth')]
-    if not models:
+    if not os.path.exists(MODELS_INFO_FILE):
         print("  暂无模型文件")
-    else:
-        for i, m in enumerate(models):
-            print(f"  [{i+1}] {m}")
-    return models
+    with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+        info = json.load(f)
+        for i, m in enumerate(info):
+            print(f"  [{i+1}] {m.key()}")
+    return list(info.keys())
 
-def update_model_info(model_path, model_type, info_file=MODELS_INFO_FILE):
+def update_model_info(model_path, model_type):
     try:
-        if os.path.exists(info_file):
-            with open(info_file, 'r', encoding='utf-8') as f:
-                info = json.load(f)
-        else:
-            info = {}
-        info[model_path] = model_type
-        with open(info_file, 'w', encoding='utf-8') as f:
-            json.dump(info, f, ensure_ascii=False, indent=2)
+        last_model_dir = None
+        if os.path.exists(MODEL_DIR_FLAG):
+            with open(MODEL_DIR_FLAG, 'r', encoding='utf-8') as f:
+                last_model_dir = f.read().strip()
+        if not last_model_dir:
+            print("模型位置定位失败，但是模型已经保存成功。请检查 data/last_model_dir.txt 文件是否存在且内容正确，并手动把模型信息写入到 data/models.json")
+            return
+        if os.path.exists(os.path.join(last_model_dir, model_path)):
+            if os.path.exists(MODELS_INFO_FILE):
+                with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+                    info = json.load(f)
+            else:
+                info = {}
+            info[model_path] = {
+                "model_name": model_path,
+                "model_type": model_type,
+                "model_dir": last_model_dir,
+                "created_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
+                json.dump(info, f, ensure_ascii=False, indent=2)
     except Exception as e:
         save_error_log(e)
 
-def get_model_type(model_path, info_file=MODELS_INFO_FILE):
-    if os.path.exists(info_file):
-        with open(info_file, 'r', encoding='utf-8') as f:
+def get_model_type(model_path):
+    if os.path.exists(MODELS_INFO_FILE):
+        with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
             info = json.load(f)
-        return info.get(model_path)
+        t = info.get(model_path, {}).get("model_type")
+        if t:
+            return t
+    return 'resnet18'
+
+def get_model_dir(model_name):
+    if os.path.exists(MODELS_INFO_FILE):
+        with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+            info = json.load(f)
+        d = info.get(model_name, {}).get("model_dir")
+        if d:
+            return d
     return None
 
 def delete_model_info(model_path, info_file=MODELS_INFO_FILE):
@@ -197,11 +223,14 @@ def photo_predict():
                 except Exception:
                     print("输入格式有误，请重新输入。")
             model_types = []
+            model_paths = []
             for i in idxs:
                 type = get_model_type(models[i])
+                path = os.path.join(get_model_dir(models[i]), models[i])
                 if type is None:
                     type = select_type()
                 model_types.append(type)
+                model_paths.append(path)
             root = tk.Tk()
             root.withdraw()
             img_path = filedialog.askopenfilename(
@@ -214,7 +243,7 @@ def photo_predict():
                 input("按任意键退出。")
                 return
             for i, idx in enumerate(idxs):
-                model_path = models[idx]
+                model_path = model_paths[i]
                 model_type = model_types[i]
                 print(f"正在用模型 {model_path} ({model_type}) 进行预测...")
                 env = os.environ.copy()
@@ -226,7 +255,7 @@ def photo_predict():
                 with open(RESULE_LOG_FILE, 'a', encoding='utf-8') as f:
                     f.write(
                         f"\n[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]\n"
-                        f"预测模型: {model_path}\n"
+                        f"预测模型: {idx}\n"
                         f"模型类型: {model_type}\n"
                         f"预测图片: {img_path}\n"
                         f"预测结果:\n{predict_output}\n"
@@ -243,6 +272,7 @@ def photo_predict():
             if not model_path:
                 return
             model_type = get_model_type(model_path)
+            real_model_path = os.path.join(get_model_dir(model_path), model_path)
             if model_type is None:
                 print("未在数据文件中检测到模型，请手动选择模型类型。\n")
                 model_type = select_type()
@@ -251,7 +281,7 @@ def photo_predict():
             print("将进行图片预测。")
             env = os.environ.copy()
             env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-            cmd = f"{sys.executable} photo_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
+            cmd = f"{sys.executable} photo_predict.py --model_path \"{real_model_path}\" --model_type \"{model_type}\""
             subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)
@@ -262,6 +292,7 @@ def video_predict():
         if not model_path:
             return
         model_type = get_model_type(model_path)
+        real_model_path = os.path.join(get_model_dir(model_path), model_path)
         if model_type is None:
             print("未在数据文件中检测到模型，请手动选择模型类型。\n")
             model_type = select_type()
@@ -270,7 +301,7 @@ def video_predict():
         print("将进行视频预测，按 Q 停止预测")
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-        cmd = f"{sys.executable} video_predict.py --model_path \"{model_path}\" --model_type \"{model_type}\""
+        cmd = f"{sys.executable} video_predict.py --model_path \"{real_model_path}\" --model_type \"{model_type}\""
         subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)
@@ -315,7 +346,11 @@ def delete_model():
             return
         ans = input(f"即将永久删除模型 {model_to_delete} ，确定删除？(Y/N): ").strip().lower()
         if ans == 'y':
-            os.remove(model_to_delete)
+            model_dir = get_model_dir(model_to_delete)
+            if model_dir == '.':
+                os.remove(model_to_delete)
+            else:
+                shutil.rmtree(model_dir)
             delete_model_info(model_to_delete)
             print(f"模型 {model_to_delete} 已成功删除。")
             input("按任意键返回主菜单")

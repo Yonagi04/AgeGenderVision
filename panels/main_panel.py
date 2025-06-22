@@ -97,6 +97,7 @@ class MainPanelWindow(QWidget):
                 self.predict_img_panel.result_text.clear()
             elif idx == 3:
                 self.predict_multi_img_panel.result_text.clear()
+                self.predict_multi_img_panel.refresh_models()
             elif idx == 4:
                 self.predict_video_panel.result_text.clear()
             elif idx == 5:

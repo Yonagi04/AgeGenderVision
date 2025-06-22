@@ -1,10 +1,11 @@
 import os
 import json
+import shutil
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QLabel, QLineEdit,
     QTextEdit, QComboBox
 )
-from utils.model_utils import refresh_model_list
+from utils.model_utils import refresh_model_list, get_model_dir
 
 MODELS_INFO_FILE = 'data/models.json'
 
@@ -44,7 +45,11 @@ class DeleteModelPanel(QWidget):
             self.result_text.append("模型名称输入错误，未删除任何文件。")
             return
         try:
-            os.remove(model)
+            model_dir = get_model_dir(model)
+            if model_dir == '.':
+                os.remove(model)
+            else:
+                shutil.rmtree(model_dir)
             if os.path.exists(MODELS_INFO_FILE):
                 with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
                     info = json.load(f)

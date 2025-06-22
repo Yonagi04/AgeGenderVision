@@ -8,12 +8,22 @@ import traceback
 import datetime
 import time
 import sys
+import matplotlib
+import signal
+matplotlib.rcParams['font.sans-serif'] = ['SimHei']
+matplotlib.rcParams['axes.unicode_minus'] = False
+import matplotlib.pyplot as plt
+import hashlib
+import json
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms, models
 from PIL import Image
 from tqdm import tqdm
 
+
 LOG_FILE = 'error_log.log'
+MODEL_DIR_FLAG = 'data/last_model_dir.txt'
 STOP_FLAG_FILE = os.path.abspath("stop.flag")
 if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
     DEVELOPER_MODE = True
@@ -115,6 +125,98 @@ def predict(img_path, model, device, transform):
         gender_idx = pred_gender.argmax(dim=1).item()
     return age, gender_idx
 
+# 创建唯一存储路径
+def gen_model_dir(model_type, model_path, save_dir="models"):
+    now = datetime.datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    unique_str = f"{model_path}-{model_type}-{timestamp}"
+    unique_id = hashlib.md5(unique_str.encode()).hexdigest()[:6]
+    if model_path.endswith('.pth'):
+        model_path = model_path[:-4]
+    folder_name = f"{date_str}-{model_path}-{model_type}-{unique_id}"
+    folder_path = os.path.join(save_dir, folder_name)
+    os.makedirs(folder_path, exist_ok=True)
+    return folder_path
+
+# 存储模型
+def save_model(model_type, model_path, model, loader, device, epochs, batch_size, img_size, val_age_loss, val_gender_loss, val_acc):
+    try:
+        model_dir = gen_model_dir(model_type, model_path)
+        model_save_path = os.path.join(model_dir, model_path)
+        torch.save(model.state_dict(), model_save_path)
+        save_img(model, model_dir, loader, device)
+        meta = {
+            "model_name": model_path,
+            "model_type": model_type,
+            "created_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "dataset": "UTKFace",
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "img_size": img_size,
+            "eval_result": {
+                "val_age_loss": float(val_age_loss),
+                "val_gender_loss": float(val_gender_loss),
+                "val_acc": float(val_acc),
+                "age_scatter_image": "age_scatter.png",
+                "gender_confusion_image": "gender_confusion.png"
+            }
+        }
+        meta_path = os.path.join(model_dir, "meta.json")
+        with open(meta_path, "w", encoding='utf-8') as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+        print(f"模型及元信息保存到 {model_dir}")
+        with open(MODEL_DIR_FLAG, 'w', encoding='utf-8') as f:
+            f.write(model_dir)
+    except Exception as e:
+        save_error_log(e)
+
+def save_img(model, model_dir, loader, device):
+    try:
+        model.eval()
+        y_true_age, y_pred_age = [], []
+        y_true_gender, y_pred_gender = [], []
+        with torch.no_grad():
+            for imgs, ages, genders in loader:
+                imgs = imgs.to(device)
+                ages = ages.cpu().numpy()
+                genders = genders.cpu().numpy()
+                pred_age, pred_gender = model(imgs)
+                pred_age = pred_age.cpu().numpy()
+                pred_gender_label = pred_gender.argmax(dim=1).cpu().numpy()
+                y_true_age.extend(ages.tolist())
+                y_pred_age.extend(pred_age.tolist())
+                y_true_gender.extend(genders.tolist())
+                y_pred_gender.extend(pred_gender_label.tolist())
+
+        plt.figure(figsize=(5, 5))
+        plt.scatter(y_true_age, y_pred_age, alpha=0.5)
+        plt.xlabel("真实年龄")
+        plt.ylabel("预测年龄")
+        plt.title("年龄回归散点图")
+        plt.plot([min(y_true_age), max(y_true_age)], [min(y_true_age), max(y_true_age)], 'r--')
+        age_fig_path = os.path.join(model_dir, "age_scatter.png")
+        plt.savefig(age_fig_path)
+        plt.close()
+
+        cm = confusion_matrix(y_true_gender, y_pred_gender, labels=[0, 1])
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Male", "Female"])
+        disp.plot(cmap=plt.cm.Blues)
+        plt.title("性别混淆矩阵")
+        gender_fig_path = os.path.join(model_dir, "gender_confusion.png")
+        plt.savefig(gender_fig_path)
+        plt.close()
+    except Exception as e:
+        save_error_log(e)
+
+def dummy_handler(signum, frame):
+    print("非命令行环境下，屏蔽Ctrl+C（KeyboardInterrupt），请通过UI停止训练。")
+
+is_tty = sys.stdout.isatty()
+if not is_tty:
+    signal.signal(signal.SIGINT, dummy_handler)
+
 def main():
     try:
         parser = argparse.ArgumentParser()
@@ -162,7 +264,7 @@ def main():
             model.train()
             total_loss = 0
             if is_tty:
-                pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{args.epochs}")
+                pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}")
             else:
                 pbar = tqdm(
                     train_loader,
@@ -176,15 +278,21 @@ def main():
                     bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
                 )
             for imgs, ages, genders in pbar:
-                if keyboard.is_pressed('q'):
+                if is_tty and keyboard.is_pressed('q'):
                     print("\n检测到 Q 键，提前结束训练。")
-                    torch.save(model.state_dict(), args.model_path)
-                    print(f'模型已保存到 {args.model_path}，模型可能不完善，请特别注意。')
+                    val_age_loss, val_gender_loss, val_acc = evaluate(model, val_loader, device, age_criterion, gender_criterion)
+                    save_model(args.model_type, args.model_path, model, val_loader, device, 
+                               args.epochs, args.batch_size, args.img_size, val_age_loss, 
+                               val_gender_loss, val_acc)
+                    print('模型可能不完善，请特别注意。')
                     return
                 if os.path.exists(STOP_FLAG_FILE):
                     print("\n检测到停止标志，提前结束训练。")
-                    torch.save(model.state_dict(), args.model_path)
-                    print(f'模型已保存到 {args.model_path}，模型可能不完善，请特别注意。')
+                    val_age_loss, val_gender_loss, val_acc = evaluate(model, val_loader, device, age_criterion, gender_criterion)
+                    save_model(args.model_type, args.model_path, model, val_loader, device,
+                               args.epochs, args.batch_size, args.img_size, val_age_loss,
+                               val_gender_loss, val_acc)
+                    print('模型可能不完善，请特别注意。')
                     os.remove(STOP_FLAG_FILE)
                     return
                 imgs, ages, genders = imgs.to(device), ages.to(device), genders.to(device)
@@ -203,7 +311,9 @@ def main():
             print(f"Epoch {epoch+1}: Train Loss={avg_loss:.4f} | Val Age Loss={val_age_loss:.4f} | Val Gender Loss={val_gender_loss:.4f} | Val Gender Acc={val_acc:.4f}")
             time.sleep(1)
 
-        torch.save(model.state_dict(), args.model_path)
+        save_model(args.model_type, args.model_path, model, val_loader, device, 
+                               args.epochs, args.batch_size, args.img_size, val_age_loss, 
+                               val_gender_loss, val_acc)
         print(f'Model saved to {args.model_path}')
     except Exception as e:
         save_error_log(e)

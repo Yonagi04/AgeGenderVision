@@ -2,6 +2,7 @@ data/
 __pycache__/
 build/
 dist/
+models/
 *.spec
 *.pyc
 *.pyo
@@ -21,4 +22,4 @@ Thumbs.db
 .vscode/
 *.ipynb_checkpoints/
 *.sqlite3
-age_gender_multitask_resnet18.pth
+

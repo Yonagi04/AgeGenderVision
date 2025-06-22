@@ -27,6 +27,13 @@ class TrainThread(QThread):
             epoch = 0
             total_epochs = None
             for line in self._process.stdout:
+                if ("\r" in line) or ("|" in line and "it/s" in line):
+                    tqdm_match = re.search(r'(\d+)\s*/\s*(\d+)', line)
+                    if tqdm_match:
+                        current = int(tqdm_match.group(1))
+                        total = int(tqdm_match.group(2))
+                        self.tqdm_signal.emit(current, total)
+                    continue
                 if "Epoch" in line:
                     m = re.search(r"Epoch\s+(\d+)/(\d+)", line)
                     if m:
@@ -35,13 +42,6 @@ class TrainThread(QThread):
                         if total_epochs:
                             percent = int(epoch / total_epochs * 100)
                             self.progress_signal.emit(percent)
-                if "|" in line and "it/s" in line:
-                    tqdm_match = re.search(r'(\d+)\s*/\s*(\d+)', line)
-                    if tqdm_match:
-                        current = int(tqdm_match.group(1))
-                        total = int(tqdm_match.group(2))
-                        self.tqdm_signal.emit(current, total)
-                        continue
                 self.log_signal.emit(line)
                 if os.path.exists(STOP_FLAG_FILE):
                     self._process.terminate()

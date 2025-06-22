@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QFileDialog, QCheckBox
 )
-from utils.model_utils import refresh_model_list, get_model_type
+from utils.model_utils import refresh_model_list, get_model_type, get_model_dir
 from threads.predict_thread import PThread
 
 RESULT_LOG_FILE = 'result_log.log'
@@ -73,6 +73,14 @@ class PredictMultiImagePanel(QWidget):
             self.result_text.append("请选择有效的图片")
             return
         model_types = [get_model_type(m) for m in selected]
+        model_path = []
+        for m in selected:
+            fold_path = get_model_dir(m)
+            if not fold_path or not os.path.exists(fold_path):
+                self.result_text.append("请选择有效的模型")
+                return
+            path = os.path.join(fold_path, m)
+            model_path.append(path)
         self.result_text.append("正在进行多模型预测，请稍候...")
         self.btn_predict.setEnabled(False)
         self.multi_results = []
@@ -99,7 +107,7 @@ class PredictMultiImagePanel(QWidget):
                     self.result_text.append("\n".join(self.multi_results))
                     self.btn_predict.setEnabled(True)
             return inner
-        for idx, m in enumerate(selected):
+        for idx, m in enumerate(model_path):
             env = os.environ.copy()
             env["IS_SUBPROCESS"] = "1"
             cmd = f"{sys.executable} photo_predict.py --model_path \"{m}\" --model_type \"{model_types[idx]}\" --img_path \"{img_path}\""

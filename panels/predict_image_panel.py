@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QComboBox, QFileDialog
 )
-from utils.model_utils import refresh_model_list, get_model_type
+from utils.model_utils import refresh_model_list, get_model_type, get_model_dir
 from threads.predict_thread import PThread
 
 class PredictImagePanel(QWidget):
@@ -46,11 +46,16 @@ class PredictImagePanel(QWidget):
 
     def predict(self):
         self.result_text.clear()
-        model_path = self.model_combo.currentText()
-        if not model_path:
+        model_name = self.model_combo.currentText()
+        if not model_name:
             self.result_text.append("请先训练模型")
             return
-        model_type = get_model_type(model_path)
+        model_type = get_model_type(model_name)
+        fold_path = get_model_dir(model_name)
+        if not fold_path or not os.path.exists(fold_path):
+            self.result_text.append("请选择有效的模型")
+            return
+        model_path = os.path.join(fold_path, model_name)
         img_path = self.img_path.text().strip()
         if not img_path or not os.path.exists(img_path):
             self.result_text.append("请选择有效的图片")

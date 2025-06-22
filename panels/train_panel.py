@@ -5,9 +5,11 @@ from PyQt5.QtWidgets import (
 import os
 import sys
 import json
+import datetime
 from threads.train_thread import TrainThread
 
 MODELS_INFO_FILE = 'data/models.json'
+MODEL_DIR_FLAG = 'data/last_model_dir.txt'
 STOP_FLAG_FILE = os.path.abspath("stop.flag")
 
 class TrainPanel(QWidget):
@@ -106,20 +108,32 @@ class TrainPanel(QWidget):
                 self.log_text.append(f"训练失败：{error}")
             else:
                 self.log_text.append("训练完成！")
-                if os.path.exists(model_path):
-                    try:
-                        if os.path.exists(MODELS_INFO_FILE):
-                            with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
-                                info = json.load(f)
-                        else:
-                            info = {}
-                        info[model_path] = model_type
-                        with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
-                            json.dump(info, f, ensure_ascii=False, indent=2)
-                    except Exception as e:
-                        self.log_text.append(f"模型信息写入失败：{e}")
+                last_model_dir = None
+                if os.path.exists(MODEL_DIR_FLAG):
+                    with open(MODEL_DIR_FLAG, 'r', encoding='utf-8') as f:
+                        last_model_dir = f.read().strip()
+                if not last_model_dir:
+                    self.log_text.append("模型位置定位失败，但是模型已经保存成功。请检查 data/last_model_dir.txt 文件是否存在且内容正确，并手动把模型信息写入到 data/models.json")
                 else:
-                    self.log_text.append("模型保存失败！请排查原因。")
+                    if os.path.exists(os.path.join(last_model_dir, model_path)):
+                        try:
+                            if os.path.exists(MODELS_INFO_FILE):
+                                with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+                                    info = json.load(f)
+                            else:
+                                info = {}
+                            info[model_path] = {
+                                "model_name": model_path,
+                                "model_type": model_type,
+                                "model_dir": last_model_dir,
+                                "created_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                            }
+                            with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
+                                json.dump(info, f, ensure_ascii=False, indent=2)
+                        except Exception as e:
+                            self.log_text.append(f"模型信息写入失败：{e}")
+                    else:
+                        self.log_text.append("模型保存失败！请排查原因。")
         self.train_thread.finished.connect(on_finish)
         self.train_thread.start()
 
