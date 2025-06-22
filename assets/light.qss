@@ -109,12 +109,87 @@ QStackedWidget QCheckBox {
     background: transparent;
 }
 
-QDialog, QMessageBox {
-    background: #f7f7f7 !important;
-    color: #222 !important;
+#deleteConfirmOverlay {
+    background: rgba(247,247,247,0.92);
+    border-bottom-left-radius: 18px;
+    border-bottom-right-radius: 18px;
+    border: 1px solid #e5e7eb;
+}
+#deleteConfirmOverlay QLabel {
+    color: #222;
+}
+#deleteConfirmOverlay QLineEdit {
+    background: #fff;
+    color: #222;
+    border: 1px solid #bbb;
+}
+#deleteConfirmOverlay QPushButton {
+    background-color: #f4f4f5;
+    color: #222;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    padding: 8px 16px;
+    font-size: 16px;
+}
+#deleteConfirmOverlay QPushButton:hover {
+    background-color: #dbeafe;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+#deleteConfirmOverlay QPushButton:pressed {
+    background-color: #2563eb;
+    color: #fff;
+    border: 1px solid #2563eb;
 }
 
-QMessageBox QLabel, QMessageBox QTextEdit {
-    background: transparent !important;
-    color: #222 !important;
+/* 模型列表整体区域 */
+QScrollArea#modelListScroll, QWidget#modelListInner {
+    background: transparent;
+    border: none;
+}
+
+/* 每个模型块 */
+QGroupBox {
+    background: #fff;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    padding: 18px 24px;
+}
+QGroupBox:title {
+    subcontrol-origin: margin;
+    left: 10px;
+    top: 8px;
+    color: #2563eb;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+/* 模型信息文本 */
+QGroupBox QLabel {
+    color: #222;
+    font-size: 16px;
+    padding: 2px 0;
+}
+
+/* 按钮区域 */
+QGroupBox QPushButton {
+    background-color: #f4f4f5;
+    color: #222;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 6px 18px;
+    font-size: 15px;
+    margin-right: 12px;
+}
+QGroupBox QPushButton:hover {
+    background-color: #dbeafe;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+QGroupBox QPushButton:pressed {
+    background-color: #2563eb;
+    color: #fff;
+    border: 1px solid #2563eb;
 }

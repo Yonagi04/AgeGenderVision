@@ -28,12 +28,11 @@ class MainPanelWindow(QWidget):
         menu_layout.setContentsMargins(10, 10, 10, 10)
         menu_layout.setSpacing(10)
         self.btn_train = QPushButton("训练模型")
-        self.btn_models = QPushButton("查看模型")
+        self.btn_models = QPushButton("模型管理")
         self.btn_predict_img = QPushButton("图片预测")
         self.btn_predict_multi_img = QPushButton("多模型图片预测")
         self.btn_predict_video = QPushButton("视频预测")
         self.btn_dedup = QPushButton("数据集去重")
-        self.btn_delete = QPushButton("删除模型")
         self.btn_log = QPushButton("查看日志")
         self.btn_theme = QPushButton()
         self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
@@ -47,13 +46,12 @@ class MainPanelWindow(QWidget):
         menu_layout.addWidget(self.btn_predict_multi_img)
         menu_layout.addWidget(self.btn_predict_video)
         menu_layout.addWidget(self.btn_dedup)
-        menu_layout.addWidget(self.btn_delete)
         menu_layout.addWidget(self.btn_log)
         menu_layout.addStretch()
         menu_layout.addWidget(self.btn_theme)
         for btn in [
             self.btn_train, self.btn_models, self.btn_predict_img, self.btn_predict_multi_img,
-            self.btn_predict_video, self.btn_dedup, self.btn_delete, self.btn_log
+            self.btn_predict_video, self.btn_dedup, self.btn_log
         ]:
             btn.setObjectName("menuButton")
 
@@ -64,7 +62,6 @@ class MainPanelWindow(QWidget):
         self.predict_multi_img_panel = PredictMultiImagePanel()
         self.predict_video_panel = PredictVideoPanel()
         self.dedup_panel = DedupPanel()
-        self.delete_panel = DeleteModelPanel()
         self.log_panel = LogPanel()
         self.stack.addWidget(self.train_panel)
         self.stack.addWidget(self.model_list_panel)
@@ -72,7 +69,6 @@ class MainPanelWindow(QWidget):
         self.stack.addWidget(self.predict_multi_img_panel)
         self.stack.addWidget(self.predict_video_panel)
         self.stack.addWidget(self.dedup_panel)
-        self.stack.addWidget(self.delete_panel)
         self.stack.addWidget(self.log_panel)
         main_layout.addLayout(menu_layout, 1)
         main_layout.addWidget(self.stack, 4)
@@ -84,7 +80,6 @@ class MainPanelWindow(QWidget):
         self.btn_predict_multi_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(3)))
         self.btn_predict_video.clicked.connect(lambda: (self.predict_video_panel.refresh_models(), self.switch_panel(4)))
         self.btn_dedup.clicked.connect(lambda: self.switch_panel(5))
-        self.btn_delete.clicked.connect(lambda: (self.delete_panel.refresh_models(), self.switch_panel(6)))
         self.btn_log.clicked.connect(lambda: (self.log_panel.refresh(), self.switch_panel(7)))
         self.btn_theme.clicked.connect(self.toggle_theme)
         self.switch_panel(0)
@@ -102,8 +97,6 @@ class MainPanelWindow(QWidget):
                 self.predict_video_panel.result_text.clear()
             elif idx == 5:
                 self.dedup_panel.result_text.clear()
-            elif idx == 6:
-                self.delete_panel.result_text.clear()
         self.stack.setCurrentIndex(idx)
         self.current_panel_idx = idx
 
