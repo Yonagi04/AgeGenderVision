@@ -14,6 +14,10 @@
 
 ```
 face_recognition/
+├── assets                             # 图形界面依赖资源
+├── panels                             # 图形界面面板类
+├── threads                            # 图形界面线程类
+├── utils                              # 图形界面工具类
 ├── check_and_deduplicate_utkface.py   # UTKFace数据去重脚本 （可独立运行）
 ├── train_age_gender_multitask.py      # 年龄性别多任务模型训练脚本 （可独立运行）
 ├── video_predict.py                   # 视频预测 （可独立运行）
@@ -21,6 +25,7 @@ face_recognition/
 ├── main.py                            # 命令行主程序 
 ├── qt5_main.py                        # 图形界面主程序
 ├── yolov8m-face.pt                    # YOLOv8m-face模型
+├── requirements.txt                   # 环境依赖
 └── data/UTKFace/                      # UTKFace数据集相关目录（需要自行创建）
 ```
 

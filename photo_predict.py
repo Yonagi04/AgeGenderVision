@@ -13,6 +13,7 @@ from torchvision import transforms, models
 from PIL import Image, ImageFont, ImageDraw
 from ultralytics import YOLO
 
+sys.stdout.reconfigure(encoding='utf-8')
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
 parser.add_argument('--model_type', type=str, default='resnet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
