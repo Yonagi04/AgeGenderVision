@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QLabel, QScrollArea, QGroupBox, QHBoxLayout, QLineEdit
 )
-from PyQt5.QtCore import QUrl, QPropertyAnimation, QRect, QEasingCurve
-from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtCore import QUrl, QPropertyAnimation, QEasingCurve, QSize
+from PyQt5.QtGui import QDesktopServices, QIcon
 import json
 import os
 import shutil
@@ -36,10 +36,17 @@ class ModelListPanel(QWidget):
         self.inner_layout = QVBoxLayout(self.inner)
         self.scroll.setWidget(self.inner)
         self.layout.addWidget(QLabel("已训练模型列表"))
+        self.btn_refresh = QPushButton()
+        self.btn_refresh.setIcon(QIcon("assets/svg/refresh.svg"))
+        self.btn_refresh.setIconSize(QSize(28, 28))
+        self.btn_refresh.setFixedSize(36, 36)
+        self.btn_refresh.setStyleSheet("border:none; background:transparent;")
         self.layout.addWidget(self.scroll)
+        self.layout.addWidget(self.btn_refresh)
 
         self.btn_confirm.clicked.connect(self._do_delete_model)
         self.btn_cancel.clicked.connect(self._hide_delete_overlay)
+        self.btn_refresh.clicked.connect(self.refresh)
 
         self._pending_delete = None
 

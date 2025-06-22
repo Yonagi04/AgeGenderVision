@@ -79,7 +79,7 @@ class MainPanelWindow(QWidget):
         self.btn_predict_multi_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(3)))
         self.btn_predict_video.clicked.connect(lambda: (self.predict_video_panel.refresh_models(), self.switch_panel(4)))
         self.btn_dedup.clicked.connect(lambda: self.switch_panel(5))
-        self.btn_log.clicked.connect(lambda: (self.log_panel.refresh(), self.switch_panel(6)))
+        self.btn_log.clicked.connect(lambda: (self.log_panel.refresh_run_log(), self.log_panel.refresh_error_log(), self.switch_panel(6)))
         self.btn_theme.clicked.connect(self.toggle_theme)
         self.switch_panel(0)
 
