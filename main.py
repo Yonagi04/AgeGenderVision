@@ -301,7 +301,7 @@ def video_predict():
         print("将进行视频预测，按 Q 停止预测")
         env = os.environ.copy()
         env["DEVELOPER_MODE"] = "1" if DEVELOPER_MODE else "0"
-        cmd = f"{sys.executable} video_predict.py --model_path \"{real_model_path}\" --model_type \"{model_type}\""
+        cmd = f"{sys.executable} camera_predict.py --model_path \"{real_model_path}\" --model_type \"{model_type}\""
         subprocess.run(cmd, shell=True, check=True, env=env)
     except Exception as e:
         save_error_log(e)

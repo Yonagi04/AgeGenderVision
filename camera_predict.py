@@ -12,15 +12,18 @@ import datetime
 from ultralytics import YOLO
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
-parser.add_argument('--model_type', type=str, default='resnet18', choices=['resnet18', 'resnet34', 'resnet50'])
-parser.add_argument('--video_path', type=str, required=True, help='输入视频路径')
-parser.add_argument('--output_path', type=str, default='output.mp4', help='输出视频路径')
+parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth', help='模型路径')
+parser.add_argument('--model_type', type=str, default='resnet18', help='模型类型', choices=['resnet18', 'resnet34', 'resnet50'])
 args = parser.parse_args()
+model_path = args.model_path
+model_type = args.model_type
 
 LOG_FILE = 'error_log.log'
 YOLO_PATH = 'yolov8m-face.pt'
-DEVELOPER_MODE = os.environ.get("DEVELOPER_MODE", "0") == "1"
+if __name__ == "__main__" and os.environ.get("DEVELOPER_MODE") is None:
+    DEVELOPER_MODE = True
+else:
+    DEVELOPER_MODE = os.environ.get("DEVELOPER_MODE", "0") == "1"
 
 def save_error_log(e):
     if DEVELOPER_MODE:
@@ -62,10 +65,10 @@ class MultiTaskResNet(nn.Module):
         return age, gender
 
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-])
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+        ])
 
 def predict(img, model, device):
     model.eval()
@@ -79,23 +82,14 @@ def predict(img, model, device):
 def main():
     try:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = MultiTaskResNet(model_type=args.model_type).to(device)
-        model.load_state_dict(torch.load(args.model_path, map_location=device, weights_only=True))
+        model = MultiTaskResNet(model_type=model_type).to(device)
+        model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
+
+        cap = cv2.VideoCapture(0)
         
         yolo_device = 0 if torch.cuda.is_available() else 'cpu'
-        yolo_face = YOLO(YOLO_PATH, verbose=False).to(yolo_device)
-
-        cap = cv2.VideoCapture(args.video_path)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-
-        print(f"开始处理视频：{args.video_path}")
-        print(f"分辨率：{width}x{height}，FPS: {fps}，总帧数: {total_frames}")
-
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(args.output_path, fourcc, fps, (width, height))
+        yolo_face = YOLO(YOLO_PATH, verbose=False)
+        yolo_face.to(yolo_device)
 
         while True:
             ret, frame = cap.read()
@@ -115,20 +109,22 @@ def main():
                 pil_img = Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
 
                 pred_age, pred_gender = predict(pil_img, model, device)
-                gender_text = "男" if pred_gender == 0 else "女"
 
-                label = f'年龄: {pred_age:.1f}, 性别: {gender_text}'
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                frame = cv2_add_chinese_text(frame, label, (x1, y1 - 20), 20, (0, 255, 0))
+                gender_text = "男" if pred_gender == 0 else "女"
+                frame = cv2_add_chinese_text(frame, f'年龄: {pred_age:.2f}, 性别: {gender_text}', (x1, y1-10), 20, (255, 0, 0))
 
-            out.write(frame)
+            cv2.imshow('Result(Press Q to leave)', frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):  # 按'q'退出
+                break
 
         cap.release()
-        out.release()
-        print(f"处理完成！已保存至：{args.output_path}")
-
+        cv2.destroyAllWindows()
     except Exception as e:
         save_error_log(e)
 
+
 if __name__ == "__main__":
     main()
+    
