@@ -1,6 +1,6 @@
 # 基于深度学习的年龄与性别预测系统
 
-本项目实现了一个基于深度学习的年龄与性别多任务预测系统，使用 UTKFace 数据集，采用 PyTorch 训练 ResNet 多任务模型，可对人脸图片或视频（基于OpenCV和YOLO）进行年龄回归与性别分类。支持图形界面（PyQt5）和命令行双模式操作。
+本项目实现了一个基于深度学习的年龄与性别多任务预测系统，使用 UTKFace 数据集，采用 PyTorch 训练 ResNet 多任务模型，可对人脸图片、视频、摄像头画面（基于OpenCV和YOLO）进行年龄回归与性别分类。支持图形界面（PyQt5）和命令行双模式操作。
 
 ## CUDA 加速支持
 
@@ -20,7 +20,8 @@ face_recognition/
 ├── utils                              # 图形界面工具类
 ├── check_and_deduplicate_utkface.py   # UTKFace数据去重脚本 （可独立运行）
 ├── train_age_gender_multitask.py      # 年龄性别多任务模型训练脚本 （可独立运行）
-├── video_predict.py                   # 视频预测 （可独立运行）
+├── camera_predict.py                  # 摄像头采集预测 （可独立运行）
+├── video_predict.py                   # 视频预测（可独立运行）
 ├── photo_predict.py                   # 图片预测 （可独立运行）
 ├── main.py                            # 命令行主程序 
 ├── qt5_main.py                        # 图形界面主程序
@@ -31,16 +32,16 @@ face_recognition/
 
 ## 主要功能
 
-- **年龄预测**：对输入人脸图片或视频进行年龄回归。
-- **性别预测**：对输入人脸图片进行性别二分类（0=男，1=女）。
+- **年龄预测**：对输入人脸图片、视频、摄像头画面进行年龄回归。
+- **性别预测**：对输入人脸图片、视频、摄像头画面进行性别二分类（0=男，1=女）。
 - **UTKFace数据处理**：自动去重并整理 UTKFace 数据集。
 - **中文结果显示**：支持在 OpenCV 窗口中以中文显示预测结果（需 Pillow 和中文字体支持）。
 - **开发者模式**：支持开发者模式，自动保存详细日志，便于调试和排查问题。可通过命令行参数 `--dev` 或 `--developer` 启动开发者模式，或在主界面切换。
-- **模型管理**：支持模型的查看、删除。
+- **模型管理**：支持模型的查看、删除，图形界面可支持搜索模型、直接查看模型元信息、将模型列表及元信息导出为CSV文件。
 - **训练模型选择**：支持手动选择训练模型，可选 `ResNet18`、`ResNet34`、`ResNet50` 模型
 - **训练中断**：训练过程中可随时按 Q 键安全中断并保存当前模型。
 - **数据集自动去重**：一键去重整理 UTKFace 数据集，避免重复图片影响训练。
-- **图形界面支持**：提供基于 PyQt5 的图形界面，支持所有主要功能，训练和预测过程异步执行，界面不卡死，训练日志和进度条实时显示，支持随时停止训练。
+- **图形界面支持**：提供基于 PyQt5 的图形界面，扁平化设计，支持浅色/深色模式，支持所有主要功能，训练和预测过程异步执行，界面不卡死，训练日志和进度条实时显示，支持随时停止训练。
 - **命令行模式支持**：支持传统命令行交互，功能与图形界面一致。
 
 ## 环境依赖
@@ -62,7 +63,7 @@ pip install -r requirements.txt
 
 ## 数据准备
 1. 下载 [UTKFace 数据集](https://susanqq.github.io/UTKFace/)，解压到 `data/UTKFace/archive/`。如果使用自定义的数据集，将它放到 `data` 文件夹下即可。
-2. 运行 `check_and_deduplicate_utkface.py`，或在主界面选择数据集自动去重功能，可自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
+2. 运行 `check_and_deduplicate_utkface.py`，或在主界面选择数据集去重功能，可自动去重并整理图片到 `data/UTKFace/cleaned/`。如果使用自定义数据集，则需要调整 `check_and_deduplicate_utkface.py` 以实现自动去重。
 
 ## 运行
 
@@ -112,7 +113,7 @@ RuntimeError: Error(s) in loading state_dict for MultiTaskResNet:
 ```
 请确认所选择的模型类型是否与模型匹配，如果确认模型类型选择无误且该问题能稳定复现，请携带错误日志提出 issue。
 - dlib/face_recognition 仅为可选依赖，主流程不依赖。
-- 训练效果不佳：请在 `train_age_gender_multitask.py` 或 `main.py` 中 `训练模型`功能的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
+- 训练效果不佳：请在 `train_age_gender_multitask.py` 或 `main.py` 中 `训练模型` 功能的训练参数项，适当地调整训练轮数、学习率和批量大小；如果在调整后训练效果依旧不佳，请改用更加复杂的模型，如ResNet34、ResNet50等
 
 ## 致谢
 - [UTKFace Dataset](https://susanqq.github.io/UTKFace/)
