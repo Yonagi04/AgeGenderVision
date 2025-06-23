@@ -81,6 +81,8 @@ class TrainPanel(QWidget):
             return
         if os.path.exists(STOP_FLAG_FILE):
             os.remove(STOP_FLAG_FILE)
+        if os.path.exists(MODEL_DIR_FLAG):
+            os.remove(MODEL_DIR_FLAG)
         self.tqdm_label.setText("训练进度：0/0")
         self.tqdm_bar.setValue(0)
         cmd = [

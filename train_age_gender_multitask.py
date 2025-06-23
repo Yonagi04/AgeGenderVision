@@ -260,6 +260,8 @@ def main():
 
         print("训练开始，在一轮训练结束时可按 Q 键退出训练。")
         is_tty = sys.stdout.isatty()
+        if os.path.exists(MODEL_DIR_FLAG):
+            os.remove(MODEL_DIR_FLAG)
         for epoch in range(args.epochs):
             model.train()
             total_loss = 0
