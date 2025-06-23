@@ -56,6 +56,7 @@ class TrainPanel(QWidget):
         self.btn_train.clicked.connect(self.start_train)
         self.btn_stop.clicked.connect(self.stop_train)
         self.train_thread = None
+        self.is_running = False
 
     def start_train(self):
         try:
@@ -82,14 +83,23 @@ class TrainPanel(QWidget):
             os.remove(STOP_FLAG_FILE)
         self.tqdm_label.setText("训练进度：0/0")
         self.tqdm_bar.setValue(0)
-        cmd = (f"{sys.executable} train_age_gender_multitask.py "
-               f"--batch_size {batch_size} --epochs {epochs} --lr {lr} "
-               f"--img_size {img_size} --data_dir \"{data_dir}\" --model_type \"{model_type}\" --model_path \"{model_path}\"")
+        cmd = [
+            sys.executable,
+            "train_age_gender_multitask.py",
+            "--batch_size", batch_size,
+            "--epochs", epochs,
+            "--lr", lr,
+            "--img_size", img_size,
+            "--data_dir", data_dir,
+            "--model_type", model_type,
+            "--model_path", model_path
+        ]
         env = os.environ.copy()
         self.log_text.clear()
         self.progress.setValue(0)
         self.btn_train.setEnabled(False)
         self.btn_stop.setEnabled(True)
+        self.is_running = True
         self.train_thread = TrainThread(cmd, env)
         self.train_thread.log_signal.connect(self.log_text.append)
         self.train_thread.progress_signal.connect(self.progress.setValue)
@@ -104,6 +114,7 @@ class TrainPanel(QWidget):
         def on_finish(error):
             self.btn_train.setEnabled(True)
             self.btn_stop.setEnabled(False)
+            self.is_running = False
             if error:
                 self.log_text.append(f"训练失败：{error}")
             else:

@@ -26,20 +26,26 @@ class DedupPanel(QWidget):
         self.btn_stop_dedup.clicked.connect(self.stop_dedup)
         self.btn_stop_dedup.setEnabled(False)
         self.dedup_thread = None
+        self.is_running = False
 
     def dedup(self):
         if os.path.exists(STOP_FLAG_FILE):
             os.remove(STOP_FLAG_FILE)
         self.result_text.clear()
         env = os.environ.copy()
-        cmd = f"{sys.executable} check_and_deduplicate_utkface.py"
+        cmd = [
+            sys.executable,
+            "check_and_deduplicate_utkface.py"
+        ]
         self.result_text.append("正在去重，请稍候...")
         self.btn_dedup.setEnabled(False)
         self.btn_stop_dedup.setEnabled(True)
+        self.is_running = True
         self.dedup_thread = PThread(cmd, env, capture_output=False)
         def on_finish(result, error):
             self.btn_dedup.setEnabled(True)
             self.btn_stop_dedup.setEnabled(False)
+            self.is_running = False
             if error:
                 self.result_text.append(f"数据集去重失败：{error}")
             else:

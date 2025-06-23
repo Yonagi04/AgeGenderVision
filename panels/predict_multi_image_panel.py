@@ -20,6 +20,7 @@ class PredictMultiImagePanel(QWidget):
         self.refresh_models()
         self.img_path = QLineEdit()
         self.img_path.setPlaceholderText("请选择图片")
+        self.img_path.setReadOnly(True)
         btn_img = QPushButton("选择图片")
         btn_img.clicked.connect(self.select_image)
         h_img = QHBoxLayout()
@@ -30,7 +31,6 @@ class PredictMultiImagePanel(QWidget):
         for cb in self.model_checks:
             self.models_layout.addWidget(cb)
         layout.addLayout(self.models_layout)
-        layout.addWidget(QLabel("选择图片"))
         layout.addLayout(h_img)
         self.btn_predict = QPushButton("开始多模型预测")
         layout.addWidget(self.btn_predict)
@@ -40,9 +40,9 @@ class PredictMultiImagePanel(QWidget):
         layout.addStretch()
         self.btn_predict.clicked.connect(self.predict)
         self.predict_threads = []
+        self.is_running = False
     
     def refresh_models(self):
-        # 清空旧的checkbox
         self.models = refresh_model_list()
         self.model_checks = []
         if hasattr(self, "models_layout"):
@@ -83,6 +83,7 @@ class PredictMultiImagePanel(QWidget):
             model_path.append(path)
         self.result_text.append("正在进行多模型预测，请稍候...")
         self.btn_predict.setEnabled(False)
+        self.is_running = True
         self.multi_results = []
         self.multi_predict_threads = []
         self.finished_count = 0
@@ -106,11 +107,18 @@ class PredictMultiImagePanel(QWidget):
                 if self.finished_count == len(selected):
                     self.result_text.append("\n".join(self.multi_results))
                     self.btn_predict.setEnabled(True)
+                    self.is_running = False
             return inner
         for idx, m in enumerate(model_path):
             env = os.environ.copy()
             env["IS_SUBPROCESS"] = "1"
-            cmd = f"{sys.executable} photo_predict.py --model_path \"{m}\" --model_type \"{model_types[idx]}\" --img_path \"{img_path}\""
+            cmd = [
+                sys.executable,
+                "photo_predict.py",
+                "--model_path", m,
+                "--model_type", model_types[idx],
+                "--img_path", img_path
+            ]
             thread = PThread(cmd, env, capture_output=True)
             thread.finished.connect(on_finish(idx))
             self.multi_predict_threads.append(thread)
