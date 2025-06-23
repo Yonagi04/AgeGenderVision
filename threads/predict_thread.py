@@ -13,10 +13,10 @@ class PThread(QThread):
         import subprocess
         try:
             if self.capture_output:
-                result = subprocess.run(self.cmd, shell=True, check=True, capture_output=True, text=True, encoding="utf-8", env=self.env)
+                result = subprocess.run(self.cmd, shell=False, check=True, capture_output=True, text=True, encoding="utf-8", env=self.env)
                 self.finished.emit(result.stdout, None)
             else:
-                subprocess.run(self.cmd, shell=True, check=True, env=self.env)
+                subprocess.run(self.cmd, shell=False, check=True, env=self.env)
                 self.finished.emit("", None)
         except Exception as e:
             self.finished.emit("", e)
