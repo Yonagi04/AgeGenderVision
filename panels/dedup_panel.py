@@ -8,8 +8,9 @@ from threads.predict_thread import PThread
 STOP_FLAG_FILE = os.path.abspath("stop.flag")
 
 class DedupPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='light'):
         super().__init__(parent)
+        self.theme = theme
         self.setContentsMargins(20, 20, 20, 20)
         layout = QVBoxLayout(self)
         hbox = QHBoxLayout()

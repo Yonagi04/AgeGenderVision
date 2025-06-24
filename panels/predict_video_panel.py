@@ -11,8 +11,9 @@ from utils.model_utils import refresh_model_list, get_model_type, get_model_dir
 from threads.predict_thread import PThread
 
 class PredictVideoPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='light'):
         super().__init__(parent)
+        self.theme = theme
         self.setContentsMargins(20, 20, 20, 20)
         layout = QVBoxLayout(self)
         self.model_combo = QComboBox()
@@ -50,17 +51,26 @@ class PredictVideoPanel(QWidget):
         self.cap = None
         control_layout = QHBoxLayout()
         self.btn_pause = QPushButton()
-        self.btn_pause.setIcon(QIcon("assets/svg/play_light.svg"))
+        if self.theme == 'light':
+            self.btn_pause.setIcon(QIcon("assets/svg/play_light.svg"))
+        else:
+            self.btn_pause.setIcon(QIcon("assets/svg/play_dark.svg"))
         self.btn_pause.setIconSize(QSize(32, 32))
         self.btn_pause.setFixedSize(40, 40)
         self.btn_pause.setStyleSheet("border:none; background:transparent;")
         self.btn_forward = QPushButton()
-        self.btn_forward.setIcon(QIcon("assets/svg/forward_light.svg"))
+        if self.theme == 'light':
+            self.btn_forward.setIcon(QIcon("assets/svg/forward_light.svg"))
+        else:
+            self.btn_forward.setIcon(QIcon("assets/svg/forward_dark.svg"))
         self.btn_forward.setIconSize(QSize(32, 32))
         self.btn_forward.setFixedSize(40, 40)
         self.btn_forward.setStyleSheet("border:none; background:transparent;")
         self.btn_backward = QPushButton()
-        self.btn_backward.setIcon(QIcon("assets/svg/backward_light.svg"))
+        if self.theme == 'light':
+            self.btn_backward.setIcon(QIcon("assets/svg/backward_light.svg"))
+        else:
+            self.btn_backward.setIcon(QIcon("assets/svg/backward_dark.svg"))
         self.btn_backward.setIconSize(QSize(32, 32))
         self.btn_backward.setFixedSize(40, 40)
         self.btn_backward.setStyleSheet("border:none; background:transparent;")

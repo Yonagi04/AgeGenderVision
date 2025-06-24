@@ -17,11 +17,11 @@ LIGHT_QSS_FILE = 'assets/light.qss'
 DARK_QSS_FILE = 'assets/dark.qss'
 
 class MainPanelWindow(QWidget):
-    def __init__(self):
+    def __init__(self, theme='light'):
         super().__init__()
+        self.current_theme = theme
         self.setWindowTitle("年龄性别识别系统")
         self.setGeometry(200, 200, 1200, 800)
-        self.current_theme = "light"
         main_layout = QHBoxLayout(self)
 
         menu_layout = QVBoxLayout()
@@ -36,7 +36,10 @@ class MainPanelWindow(QWidget):
         self.btn_dedup = QPushButton("数据集去重")
         self.btn_log = QPushButton("查看日志")
         self.btn_theme = QPushButton()
-        self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
+        if theme == 'light':
+            self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
+        else:
+            self.btn_theme.setIcon(QIcon("assets/svg/sun.svg"))
         self.btn_theme.setIconSize(QSize(28, 28))
         self.btn_theme.setFixedSize(36, 36)
         self.btn_theme.setStyleSheet("border:none; background:transparent;")
@@ -57,14 +60,14 @@ class MainPanelWindow(QWidget):
             btn.setObjectName("menuButton")
 
         self.stack = QStackedWidget()
-        self.train_panel = TrainPanel()
-        self.model_list_panel = ModelListPanel()
-        self.predict_img_panel = PredictImagePanel()
-        self.predict_multi_img_panel = PredictMultiImagePanel()
-        self.predict_camera_panel = PredictCameraPanel()
-        self.predict_video_panel = PredictVideoPanel()
-        self.dedup_panel = DedupPanel()
-        self.log_panel = LogPanel()
+        self.train_panel = TrainPanel(theme=theme)
+        self.model_list_panel = ModelListPanel(theme=theme)
+        self.predict_img_panel = PredictImagePanel(theme=theme)
+        self.predict_multi_img_panel = PredictMultiImagePanel(theme=theme)
+        self.predict_camera_panel = PredictCameraPanel(theme=theme)
+        self.predict_video_panel = PredictVideoPanel(theme=theme)
+        self.dedup_panel = DedupPanel(theme=theme)
+        self.log_panel = LogPanel(theme=theme)
         self.stack.addWidget(self.train_panel)
         self.stack.addWidget(self.model_list_panel)
         self.stack.addWidget(self.predict_img_panel)

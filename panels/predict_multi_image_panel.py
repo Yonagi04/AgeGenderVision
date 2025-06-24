@@ -11,8 +11,9 @@ from threads.predict_thread import PThread
 RESULT_LOG_FILE = 'result_log.log'
 
 class PredictMultiImagePanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='light'):
         super().__init__(parent)
+        self.theme = theme
         self.setContentsMargins(20, 20, 20, 20)
         layout = QVBoxLayout(self)
         self.model_checks = []

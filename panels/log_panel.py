@@ -9,8 +9,9 @@ RESULT_LOG_FILE = 'result_log.log'
 ERROR_LOG_FILE = 'error_log.log'
 
 class LogPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='light'):
         super().__init__(parent)
+        self.theme = theme
         self.setContentsMargins(20, 20, 20, 20)
         layout = QVBoxLayout(self)
         self.run_log_text = QTextEdit()
@@ -19,7 +20,10 @@ class LogPanel(QWidget):
         layout.addWidget(QLabel("运行结果日志"))
         layout.addWidget(self.run_log_text)
         self.run_log_refresh_btn = QPushButton()
-        self.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
+        if self.theme == 'light':
+            self.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
+        else:
+            self.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
         self.run_log_refresh_btn.setIconSize(QSize(28, 28))
         self.run_log_refresh_btn.setFixedSize(36, 36)
         self.run_log_refresh_btn.setStyleSheet("border:none; background:transparent;")
@@ -30,7 +34,10 @@ class LogPanel(QWidget):
         layout.addWidget(QLabel("错误日志"))
         layout.addWidget(self.error_log_text)
         self.error_log_refresh_btn = QPushButton()
-        self.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
+        if self.theme == 'light':
+            self.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
+        else:
+            self.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
         self.error_log_refresh_btn.setIconSize(QSize(28, 28))
         self.error_log_refresh_btn.setFixedSize(36, 36)
         self.error_log_refresh_btn.setStyleSheet("border:none; background:transparent;")

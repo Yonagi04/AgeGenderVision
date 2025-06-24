@@ -13,7 +13,8 @@ MODEL_DIR_FLAG = 'data/last_model_dir.txt'
 STOP_FLAG_FILE = os.path.abspath("stop.flag")
 
 class TrainPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='light'):
+        self.theme = theme
         super().__init__(parent)
         self.setContentsMargins(20, 20, 20, 20)
         layout = QVBoxLayout(self)
