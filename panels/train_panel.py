@@ -27,13 +27,13 @@ class TrainPanel(QWidget):
         self.model_type = QComboBox()
         self.model_type.addItems(['resnet18', 'resnet34', 'resnet50'])
         self.model_path = QLineEdit("age_gender_multitask_resnet18.pth")
+        form.addRow("模型名称", self.model_path)
+        form.addRow("模型类型", self.model_type)
+        form.addRow("数据集目录", self.data_dir)
         form.addRow("Batch size", self.batch_size)
         form.addRow("Epochs", self.epochs)
         form.addRow("Learning rate", self.lr)
         form.addRow("Image size", self.img_size)
-        form.addRow("数据集目录", self.data_dir)
-        form.addRow("模型类型", self.model_type)
-        form.addRow("模型保存路径", self.model_path)
         layout.addLayout(form)
         self.btn_train = QPushButton("开始训练")
         self.btn_stop = QPushButton("停止训练")
@@ -80,6 +80,18 @@ class TrainPanel(QWidget):
         except Exception as e:
             self.log_text.append(f"参数错误：{e}")
             return
+        if os.path.exists(MODELS_INFO_FILE):
+            try:
+                with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+                    info = json.load(f)
+                if info:
+                    for name, meta in info.items():
+                        if name == model_path:
+                            self.log_text.append(f"模型 {model_path} 已存在，可能会覆盖原有模型。")
+                            return
+            except Exception as e:
+                self.log_text.append(f"加载模型信息失败: {e}")
+
         if os.path.exists(STOP_FLAG_FILE):
             os.remove(STOP_FLAG_FILE)
         if os.path.exists(MODEL_DIR_FLAG):
@@ -140,7 +152,8 @@ class TrainPanel(QWidget):
                                 "model_name": model_path,
                                 "model_type": model_type,
                                 "model_dir": last_model_dir,
-                                "created_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                "created_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "description": "Created by AgeGenderVision"
                             }
                             with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
                                 json.dump(info, f, ensure_ascii=False, indent=2)
