@@ -2,12 +2,13 @@ from PyQt5.QtWidgets import QMessageBox, QPushButton
 from PyQt5.QtCore import Qt
 
 class MessageBox(QMessageBox):
-    def __init__(self, parent=None, title="提示", text="内容", theme="light", icon=QMessageBox.Information):
+    def __init__(self, parent=None, title="提示", text="内容", theme="light", icon=QMessageBox.Information, addButton=True):
         super().__init__(parent)
         self.setWindowTitle(title)
         self.setText(text)
         self.setIcon(icon)
-        self.setStandardButtons(QMessageBox.Ok)
+        if addButton:
+            self.setStandardButtons(QMessageBox.Ok)
         self.apply_theme(theme)
         self.setMinimumWidth(300)
 
