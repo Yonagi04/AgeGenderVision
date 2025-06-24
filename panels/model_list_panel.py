@@ -7,14 +7,16 @@ import json
 import csv
 import os
 import shutil
+import zipfile
 from threads.model_import_thread import ModelImportThread
 from widgets.message_box import MessageBox
 
 MODELS_INFO_FILE = os.path.join("data", "models.json")
 
 class ModelListPanel(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, theme='light'):
         super().__init__(parent)
+        self.theme = theme
         self.setContentsMargins(20, 20, 20, 20)
         self.layout = QVBoxLayout(self)
 
@@ -43,19 +45,28 @@ class ModelListPanel(QWidget):
         self.btn_search = QPushButton("搜索")
 
         self.btn_refresh = QPushButton()
-        self.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
+        if self.theme == 'light':
+            self.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
+        else:
+            self.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
         self.btn_refresh.setIconSize(QSize(28, 28))
         self.btn_refresh.setFixedSize(36, 36)
         self.btn_refresh.setStyleSheet("border:none; background:transparent;")
 
         self.btn_download = QPushButton()
-        self.btn_download.setIcon(QIcon("assets/svg/download_light.svg"))
+        if self.theme == 'light':
+            self.btn_download.setIcon(QIcon("assets/svg/download_light.svg"))
+        else:
+            self.btn_download.setIcon(QIcon("assets/svg/download_dark.svg"))
         self.btn_download.setIconSize(QSize(22, 22))
         self.btn_download.setFixedSize(36, 36)
         self.btn_download.setStyleSheet("border:none; background:transparent;")
 
         self.btn_upload = QPushButton()
-        self.btn_upload.setIcon(QIcon("assets/svg/upload_light.svg"))
+        if self.theme == 'light':
+            self.btn_upload.setIcon(QIcon("assets/svg/upload_light.svg"))
+        else:
+            self.btn_upload.setIcon(QIcon("assets/svg/upload_dark.svg"))
         self.btn_upload.setIconSize(QSize(20, 20))
         self.btn_upload.setFixedSize(36, 36)
         self.btn_upload.setStyleSheet("border:none; background:transparent;")
@@ -79,17 +90,32 @@ class ModelListPanel(QWidget):
         self._pending_delete = None
 
     def refresh(self):
+        self.theme = self.get_current_theme()
         for i in reversed(range(self.inner_layout.count())):
             widget = self.inner_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
         if not os.path.exists(MODELS_INFO_FILE):
-            self.inner_layout.addWidget(QLabel("暂无模型文件"))
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="暂无模型文件",
+                icon=QMessageBox.Information,
+                theme=self.theme
+            )
+            msg_box.exec_()
             return
         with open(MODELS_INFO_FILE, "r", encoding="utf-8") as f:
             info = json.load(f)
         if not info:
-            self.inner_layout.addWidget(QLabel("暂无模型文件"))
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="暂无模型文件",
+                icon=QMessageBox.Information,
+                theme=self.theme
+            )
+            msg_box.exec_()
             return
         for model_name, meta in info.items():
             model_type = meta.get("model_type", "未知")
@@ -117,6 +143,15 @@ class ModelListPanel(QWidget):
                 btn_meta.setEnabled(True)
             btn_meta.clicked.connect(lambda _, d=model_dir: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(os.path.join(d, 'meta.json')))))
             hbox.addWidget(btn_meta)
+            btn_output = QPushButton("导出模型包")
+            if model_dir == '.':
+                btn_output.setEnabled(False)
+                btn_output.setToolTip("无法导出，因为模型存储在主文件夹")
+            else:
+                btn_output.setEnabled(True)
+            btn_output.clicked.connect(lambda _, m=model_name, d=model_dir: self.output_model(m, d))
+            hbox.addWidget(btn_output)
+
             vbox.addLayout(hbox)
             self.inner_layout.addWidget(group)
         self.inner_layout.addStretch()
@@ -132,6 +167,7 @@ class ModelListPanel(QWidget):
         return theme
 
     def search(self):
+        self.theme = self.get_current_theme()
         keyword = self.search_box.text().strip().lower()
         if not keyword:
             self.refresh()
@@ -143,11 +179,28 @@ class ModelListPanel(QWidget):
                 widget.deleteLater()
 
         if not os.path.exists(MODELS_INFO_FILE):
-            self.inner_layout.addWidget(QLabel("暂无模型信息"))
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="暂无模型文件",
+                icon=QMessageBox.Information,
+                theme=self.theme
+            )
+            msg_box.exec_()
             return
         
         with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
             info = json.load(f)
+        if not info:
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="暂无模型文件",
+                icon=QMessageBox.Information,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            return
 
         found = False
         for model_name, meta in info.items():
@@ -187,90 +240,149 @@ class ModelListPanel(QWidget):
                 btn_meta.setEnabled(True)
             btn_meta.clicked.connect(lambda _, d=model_dir: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(os.path.join(d, 'meta.json')))))
             hbox.addWidget(btn_meta)
+            btn_output = QPushButton("导出模型包")
+            if model_dir == '.':
+                btn_output.setEnabled(False)
+                btn_output.setToolTip("无法导出，因为模型存储在主文件夹")
+            else:
+                btn_output.setEnabled(True)
+            btn_output.clicked.connect(lambda _, m=model_name, d=model_dir: self.output_model(m, d))
+            hbox.addWidget(btn_output)
             vbox.addLayout(hbox)
             self.inner_layout.addWidget(group)
         if not found:
-            self.inner_layout.addWidget(QLabel("未找到匹配的模型"))
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="未找到匹配的模型",
+                icon=QMessageBox.Information,
+                theme=self.theme
+            )
+            msg_box.exec()
+            self.refresh()
         self.inner_layout.addStretch()
     
     def download(self):
-        if not os.path.exists(MODELS_INFO_FILE):
-            # self.inner_layout.addWidget(QLabel("暂无模型信息"))
-            theme = self.get_current_theme()
-            msg_box = MessageBox(
-                parent=self,
-                title="下载模型信息",
-                text="暂无模型信息",
-                icon=QMessageBox.Information,
-                theme=theme
-            )
-            msg_box.exec_()
-            return
-        with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
-            info = json.load(f)
-        if not info:
-            theme = self.get_current_theme()
-            msg_box = MessageBox(
-                parent=self,
-                title="下载模型信息",
-                text="暂无模型信息",
-                icon=QMessageBox.Information,
-                theme=theme
-            )
-            msg_box.exec_()
-            return
-        
-        export_path = os.path.join(".", "models_export.csv")
-        os.makedirs(os.path.dirname(export_path), exist_ok=True)
-        
-        rows = []
-        all_keys = set()
-
-        def flatten_dict(d, parent_key = ''):
-            items = {}
-            for k, v in d.items():
-                new_key = f"{parent_key}.{k}" if parent_key else k
-                if isinstance(v, dict):
-                    items.update(flatten_dict(v, new_key))
-                else:
-                    items[new_key] = v
-            return items
-        
-        for model_name, fallback_meta in info.items():
-            model_dir = fallback_meta.get("model_dir", ".")
-            meta_json_path = os.path.join(model_dir, "meta.json")
-            meta = fallback_meta.copy()
-
-            if os.path.exists(meta_json_path):
-                try:
-                    with open(meta_json_path, "r", encoding='utf-8') as f:
-                        detailed_meta = json.load(f)
-                        meta.update(detailed_meta)
-                except Exception as e:
-                    print(f"读取 {meta_json_path} 失败: {e}")
+        try:
+            self.theme = self.get_current_theme()
+            if not os.path.exists(MODELS_INFO_FILE):
+                msg_box = MessageBox(
+                    parent=self,
+                    title="提示",
+                    text="暂无模型信息",
+                    icon=QMessageBox.Information,
+                    theme=self.theme
+                )
+                msg_box.exec_()
+                return
+            with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
+                info = json.load(f)
+            if not info:
+                msg_box = MessageBox(
+                    parent=self,
+                    title="提示",
+                    text="暂无模型信息",
+                    icon=QMessageBox.Information,
+                    theme=self.theme
+                )
+                msg_box.exec_()
+                return
             
-            flat_meta = flatten_dict(meta)
-            flat_meta["model_name"] = model_name
-            all_keys.update(flat_meta.keys())
-            rows.append(flat_meta)
+            ask_box = MessageBox(
+                parent=self,
+                title="请选择保存格式",
+                text="请选择保存格式（CSV / JSON）",
+                icon=QMessageBox.Information,
+                theme=self.theme,
+                addButton=False
+            )
+            ask_box.add_buttons({
+                "CSV": QMessageBox.AcceptRole,
+                "JSON": QMessageBox.AcceptRole,
+                "取消": QMessageBox.RejectRole
+            })
+            ask_box.exec_()
+            if ask_box.get_clicked_button() not in ['CSV', 'JSON']:
+                return
+            
+            export_dir = "exports"
+            os.makedirs(export_dir, exist_ok=True)
+            
+            rows = []
+            all_keys = set()
 
-        # all_keys = sorted(all_keys)
-        with open(export_path, 'w', newline='', encoding='utf-8-sig') as cf:
-            writer = csv.writer(cf)
-            writer.writerow(all_keys)
-            for row in rows:
-                writer.writerow([row.get(k, "") for k in all_keys])
-        
-        theme = self.get_current_theme()
-        msg_box = MessageBox(
-            parent=self,
-            title="下载模型信息",
-            text="下载模型信息成功",
-            icon=QMessageBox.Information,
-            theme=theme
-        )
-        msg_box.exec_()
-        QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(export_path)))
+            def flatten_dict(d, parent_key = ''):
+                items = {}
+                for k, v in d.items():
+                    new_key = f"{parent_key}.{k}" if parent_key else k
+                    if isinstance(v, dict):
+                        items.update(flatten_dict(v, new_key))
+                    else:
+                        items[new_key] = v
+                return items
+            
+            for model_name, fallback_meta in info.items():
+                model_dir = fallback_meta.get("model_dir", ".")
+                meta_json_path = os.path.join(model_dir, "meta.json")
+                meta = fallback_meta.copy()
+
+                if os.path.exists(meta_json_path):
+                    try:
+                        with open(meta_json_path, "r", encoding='utf-8') as f:
+                            detailed_meta = json.load(f)
+                            meta.update(detailed_meta)
+                    except Exception as e:
+                        print(f"读取 {meta_json_path} 失败: {e}")
+                
+                flat_meta = flatten_dict(meta)
+                flat_meta["model_name"] = model_name
+                all_keys.update(flat_meta.keys())
+                rows.append(flat_meta)
+
+            if ask_box.get_clicked_button() == 'CSV':
+                export_path = os.path.join(export_dir, "models_export.csv")
+                with open(export_path, 'w', newline='', encoding='utf-8-sig') as cf:
+                    writer = csv.writer(cf)
+                    writer.writerow(all_keys)
+                    for row in rows:
+                        writer.writerow([row.get(k, "") for k in all_keys])
+                
+                msg_box = MessageBox(
+                    parent=self,
+                    title="下载模型信息成功",
+                    text="模型信息已导出为 CSV 格式",
+                    icon=QMessageBox.Information,
+                    theme=self.theme
+                )
+                msg_box.exec_()
+                QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(export_path)))
+            else:
+                export_path = os.path.join(export_dir, "models_export.json")
+                merged_json = {}
+                for row in rows:
+                    model_name = row.get("model_name", "未知模型")
+                    merged_json[model_name] = row
+                with open(export_path, 'w', encoding='utf-8') as jf:
+                    json.dump(merged_json, jf, indent=2, ensure_ascii=False)
+
+                msg_box = MessageBox(
+                    parent=self,
+                    title="下载模型信息成功",
+                    text="模型信息已导出为 JSON 格式",
+                    icon=QMessageBox.Information,
+                    theme=self.theme
+                )
+                msg_box.exec_()
+                QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(export_path)))
+        except Exception as e:
+            msg_box = MessageBox(
+                parent=self,
+                title="下载模型信息失败",
+                text=f"模型信息导出失败: {e}",
+                icon=QMessageBox.Critical,
+                theme=self.theme
+            )
+            msg_box.exec_()
 
     def upload(self):
         path, _ = QFileDialog.getOpenFileName(self, "选择模型进行上传", "", "PyTorch 模型文件 (*.pth *.pt)")
@@ -282,17 +394,56 @@ class ModelListPanel(QWidget):
         self.thread.finished.connect(self.on_model_import_finished)
         self.thread.start()
 
+    def output_model(self, model_name, model_dir):
+        try:
+            self.theme = self.get_current_theme()
+            zip_filename = f"{model_name}_export.zip"
+            zip_path = os.path.join("exports", zip_filename)
+            os.makedirs("exports", exist_ok=True)
+
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                model_path = os.path.join(model_dir, model_name)
+                if os.path.exists(model_path):
+                    zf.write(model_path, arcname=model_name)
+
+                meta_path = os.path.join(model_dir, "meta.json")
+                if os.path.exists(meta_path):
+                    zf.write(meta_path, arcname="meta.json")
+
+                for img_name in ['age_scatter.png', 'gender_confusion.png']:
+                    img_path = os.path.join(model_dir, img_name)
+                    if os.path.exists(img_path):
+                        zf.write(img_path, arcname=img_name)
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="导出成功！",
+                theme=self.theme,
+                icon=QMessageBox.Information
+            )
+            msg_box.exec_()
+            QDesktopServices.openUrl(QUrl.fromLocalFile(zip_path))
+        except Exception as e:
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text=f"导出失败: {e}",
+                theme=self.theme,
+                icon=QMessageBox.Critical
+            )
+            msg_box.exec_()
+
     def on_model_import_finished(self, success, msg):
         self.btn_upload.setEnabled(True)
         if success:
             self.refresh()
-        theme = self.get_current_theme()
+        self.theme = self.get_current_theme()
         msg_box = MessageBox(
             parent=self,
             title="上传模型",
             text=msg,
             icon=QMessageBox.Information if success else QMessageBox.Critical,
-            theme=theme
+            theme=self.theme
         )
         msg_box.exec_()
         
