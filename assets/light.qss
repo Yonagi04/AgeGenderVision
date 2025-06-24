@@ -193,3 +193,36 @@ QGroupBox QPushButton:pressed {
     color: #fff;
     border: 1px solid #2563eb;
 }
+
+QMessageBox {
+    background-color: #ffffff;
+    color: #222222;
+    font-size: 16px;
+    border-radius: 12px;
+    border: 1px solid #ccc;
+}
+
+QMessageBox QLabel,
+QMessageBox QTextEdit,
+QMessageBox QPlainTextEdit,
+QMessageBox QTextBrowser {
+    color: #222222;
+}
+
+QMessageBox QPushButton {
+    background-color: #f4f4f5;
+    color: #222222;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 6px 16px;
+}
+QMessageBox QPushButton:hover {
+    background-color: #dbeafe;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+}
+QMessageBox QPushButton:pressed {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: 1px solid #2563eb;
+}
