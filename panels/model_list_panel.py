@@ -1,12 +1,14 @@
 from PyQt5.QtWidgets import (
-    QWidget, QPushButton, QVBoxLayout, QLabel, QScrollArea, QGroupBox, QHBoxLayout, QLineEdit
+    QWidget, QPushButton, QVBoxLayout, QLabel, QScrollArea, QGroupBox, QHBoxLayout, QLineEdit, QFileDialog, QMessageBox
 )
-from PyQt5.QtCore import QUrl, QPropertyAnimation, QEasingCurve, QSize
+from PyQt5.QtCore import QUrl, QPropertyAnimation, QEasingCurve, QSize, Qt, QTimer
 from PyQt5.QtGui import QDesktopServices, QIcon
 import json
 import csv
 import os
 import shutil
+from threads.model_import_thread import ModelImportThread
+from widgets.message_box import MessageBox
 
 MODELS_INFO_FILE = os.path.join("data", "models.json")
 
@@ -36,34 +38,43 @@ class ModelListPanel(QWidget):
         self.inner = QWidget()
         self.inner_layout = QVBoxLayout(self.inner)
         self.scroll.setWidget(self.inner)
-        # self.layout.addWidget(QLabel("已训练模型列表"))
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("输入模型名称、类型、创建时间以搜索")
         self.btn_search = QPushButton("搜索")
+
         self.btn_refresh = QPushButton()
         self.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
         self.btn_refresh.setIconSize(QSize(28, 28))
         self.btn_refresh.setFixedSize(36, 36)
         self.btn_refresh.setStyleSheet("border:none; background:transparent;")
+
         self.btn_download = QPushButton()
         self.btn_download.setIcon(QIcon("assets/svg/download_light.svg"))
         self.btn_download.setIconSize(QSize(22, 22))
         self.btn_download.setFixedSize(36, 36)
         self.btn_download.setStyleSheet("border:none; background:transparent;")
+
+        self.btn_upload = QPushButton()
+        self.btn_upload.setIcon(QIcon("assets/svg/upload_light.svg"))
+        self.btn_upload.setIconSize(QSize(20, 20))
+        self.btn_upload.setFixedSize(36, 36)
+        self.btn_upload.setStyleSheet("border:none; background:transparent;")
+
         self.hbox = QHBoxLayout()
         self.hbox.addWidget(self.search_box)
         self.hbox.addWidget(self.btn_search)
         self.hbox.addWidget(self.btn_refresh)
+        self.hbox.addWidget(self.btn_upload)
         self.hbox.addWidget(self.btn_download)
         self.layout.addLayout(self.hbox)
         self.layout.addWidget(self.scroll)
-        # self.layout.addWidget(self.btn_refresh)
 
         self.btn_confirm.clicked.connect(self._do_delete_model)
         self.btn_cancel.clicked.connect(self._hide_delete_overlay)
         self.btn_refresh.clicked.connect(self.refresh)
         self.btn_search.clicked.connect(self.search)
         self.btn_download.clicked.connect(self.download)
+        self.btn_upload.clicked.connect(self.upload)
 
         self._pending_delete = None
 
@@ -109,6 +120,16 @@ class ModelListPanel(QWidget):
             vbox.addLayout(hbox)
             self.inner_layout.addWidget(group)
         self.inner_layout.addStretch()
+
+    def get_current_theme(self):
+        theme = "light"
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "current_theme"):
+                theme = parent.current_theme
+                break
+            parent = parent.parent()
+        return theme
 
     def search(self):
         keyword = self.search_box.text().strip().lower()
@@ -174,12 +195,29 @@ class ModelListPanel(QWidget):
     
     def download(self):
         if not os.path.exists(MODELS_INFO_FILE):
-            self.inner_layout.addWidget(QLabel("暂无模型信息"))
+            # self.inner_layout.addWidget(QLabel("暂无模型信息"))
+            theme = self.get_current_theme()
+            msg_box = MessageBox(
+                parent=self,
+                title="下载模型信息",
+                text="暂无模型信息",
+                icon=QMessageBox.Information,
+                theme=theme
+            )
+            msg_box.exec_()
             return
         with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
             info = json.load(f)
         if not info:
-            self.inner_layout.addWidget(QLabel("暂无模型信息"))
+            theme = self.get_current_theme()
+            msg_box = MessageBox(
+                parent=self,
+                title="下载模型信息",
+                text="暂无模型信息",
+                icon=QMessageBox.Information,
+                theme=theme
+            )
+            msg_box.exec_()
             return
         
         export_path = os.path.join(".", "models_export.csv")
@@ -223,8 +261,41 @@ class ModelListPanel(QWidget):
             for row in rows:
                 writer.writerow([row.get(k, "") for k in all_keys])
         
+        theme = self.get_current_theme()
+        msg_box = MessageBox(
+            parent=self,
+            title="下载模型信息",
+            text="下载模型信息成功",
+            icon=QMessageBox.Information,
+            theme=theme
+        )
+        msg_box.exec_()
         QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(export_path)))
 
+    def upload(self):
+        path, _ = QFileDialog.getOpenFileName(self, "选择模型进行上传", "", "PyTorch 模型文件 (*.pth *.pt)")
+        if not path:
+            return
+        allowed_types = ['resnet18', 'resnet34', 'resnet50']
+        self.btn_upload.setEnabled(False)
+        self.thread = ModelImportThread(path, allowed_types)
+        self.thread.finished.connect(self.on_model_import_finished)
+        self.thread.start()
+
+    def on_model_import_finished(self, success, msg):
+        self.btn_upload.setEnabled(True)
+        if success:
+            self.refresh()
+        theme = self.get_current_theme()
+        msg_box = MessageBox(
+            parent=self,
+            title="上传模型",
+            text=msg,
+            icon=QMessageBox.Information if success else QMessageBox.Critical,
+            theme=theme
+        )
+        msg_box.exec_()
+        
     def show_delete_overlay(self, model_name, model_dir):
         self._pending_delete = (model_name, model_dir)
         self.delete_label.setText(f"确认删除模型: {model_name}")

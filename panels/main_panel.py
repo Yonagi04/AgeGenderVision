@@ -117,6 +117,7 @@ class MainPanelWindow(QWidget):
             self.btn_theme.setIcon(QIcon("assets/svg/sun.svg"))
             self.model_list_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.model_list_panel.btn_download.setIcon(QIcon("assets/svg/download_dark.svg"))
+            self.model_list_panel.btn_upload.setIcon(QIcon("assets/svg/upload_dark.svg"))
             self.log_panel.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.log_panel.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             if self.predict_video_panel.is_paused:
@@ -131,6 +132,7 @@ class MainPanelWindow(QWidget):
             self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
             self.model_list_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.model_list_panel.btn_download.setIcon(QIcon("assets/svg/download_light.svg"))
+            self.model_list_panel.btn_upload.setIcon(QIcon("assets/svg/upload_light.svg"))
             self.log_panel.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.log_panel.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
             if self.predict_video_panel.is_paused:
