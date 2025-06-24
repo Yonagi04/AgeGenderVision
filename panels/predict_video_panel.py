@@ -34,7 +34,6 @@ class PredictVideoPanel(QWidget):
         h_video.addWidget(self.btn_output)
         layout.addWidget(QLabel("选择模型"))
         layout.addWidget(self.model_combo)
-        layout.addWidget(QLabel("选择视频"))
         layout.addLayout(h_video)
         self.btn_predict = QPushButton("开始预测")
         self.btn_predict.clicked.connect(self.predict)

@@ -65,8 +65,8 @@ class PredictMultiImagePanel(QWidget):
     def predict(self):
         self.result_text.clear()
         selected = [cb.text() for cb in self.model_checks if cb.isChecked()]
-        if not selected:
-            self.result_text.append("请至少选择一个模型进行比较")
+        if len(selected) <= 1:
+            self.result_text.append("请至少选择两个模型进行比较")
             return
         img_path = self.img_path.text().strip()
         if not img_path or not os.path.exists(img_path):

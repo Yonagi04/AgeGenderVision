@@ -135,7 +135,7 @@ def gen_model_dir(model_type, model_path, save_dir="models"):
     unique_id = hashlib.md5(unique_str.encode()).hexdigest()[:6]
     if model_path.endswith('.pth'):
         model_path = model_path[:-4]
-    folder_name = f"{date_str}-{model_path}-{model_type}-{unique_id}"
+    folder_name = f"{date_str}-{model_path}-{unique_id}"
     folder_path = os.path.join(save_dir, folder_name)
     os.makedirs(folder_path, exist_ok=True)
     return folder_path
