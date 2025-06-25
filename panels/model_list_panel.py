@@ -12,6 +12,7 @@ import zipfile
 from threads.model_import_thread import ModelImportThread
 from widgets.message_box import MessageBox
 from widgets.input_dialog import InputDialog
+from widgets.select_dialog import SelectDialog
 from services.model_service import ModelService
 from convention.result_code import ResultCode
 
@@ -30,7 +31,7 @@ class ModelListPanel(QWidget):
         self.inner_layout = QVBoxLayout(self.inner)
         self.scroll.setWidget(self.inner)
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("输入模型名称、类型、创建时间以搜索")
+        self.search_box.setPlaceholderText("输入模型名称、类型、创建时间、备注以搜索")
         self.btn_search = QPushButton("搜索")
 
         self.btn_refresh = QPushButton()
@@ -119,6 +120,7 @@ class ModelListPanel(QWidget):
             model_type = meta.get("model_type", "未知")
             model_dir = meta.get("model_dir", "未知")
             created_time = meta.get("created_time", "未知")
+            update_time = meta.get("update_time", "未知")
             description = meta.get("description", "未知")
             group = QGroupBox()
             vbox = QVBoxLayout(group)
@@ -126,6 +128,7 @@ class ModelListPanel(QWidget):
             vbox.addWidget(QLabel(f"模型类型: {model_type}"))
             vbox.addWidget(QLabel(f"存放位置: {model_dir}"))
             vbox.addWidget(QLabel(f"创建时间: {created_time}"))
+            vbox.addWidget(QLabel(f"更新时间: {update_time}"))
             vbox.addWidget(QLabel(f"备注: {description}"))
             hbox = QHBoxLayout()
             btn_open = QPushButton("打开目录")
@@ -152,6 +155,7 @@ class ModelListPanel(QWidget):
             menu = QMenu()
             menu.addAction("重命名模型", lambda m=model_name: self.rename_model(m))
             menu.addAction("设置备注", lambda m=model_name,d=description: self.set_description(m, d))
+            menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
             menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
             btn_more.setMenu(menu)
             hbox.addWidget(btn_more)
@@ -197,16 +201,9 @@ class ModelListPanel(QWidget):
         for model_name, meta in model_info.data.items():
             model_type = meta.get("model_type", "未知")
             created_time = meta.get("created_time", "未知")
+            update_time = meta.get("update_time", "未知")
             model_dir = meta.get("model_dir", "未知")
             description = meta.get("description", "未知")
-
-            match = (
-                keyword in model_name.lower() or
-                keyword in model_type.lower() or
-                keyword in created_time.lower()
-            )
-            if not match:
-                continue
             
             group = QGroupBox()
             vbox = QVBoxLayout(group)
@@ -214,6 +211,7 @@ class ModelListPanel(QWidget):
             vbox.addWidget(QLabel(f"模型类型: {model_type}"))
             vbox.addWidget(QLabel(f"存放位置: {model_dir}"))
             vbox.addWidget(QLabel(f"创建时间: {created_time}"))
+            vbox.addWidget(QLabel(f"修改时间: {update_time}"))
             vbox.addWidget(QLabel(f"备注: {description}"))
 
             hbox = QHBoxLayout()
@@ -366,7 +364,6 @@ class ModelListPanel(QWidget):
         msg_box.exec_()
         QDesktopServices.openUrl(QUrl.fromLocalFile(zip_path))
         
-        
     def rename_model(self, old_model_name):
         self.theme = self.get_current_theme()
         dialog = InputDialog(
@@ -448,6 +445,56 @@ class ModelListPanel(QWidget):
         )
         msg_box.exec_()
         self.refresh()
+
+    def update_model_type(self, model_name, old_model_type):
+        self.theme = self.get_current_theme()
+        type_options = ['resnet18', 'resnet34', 'resnet50']
+        dialog = SelectDialog(
+            parent=self,
+            title="选择",
+            text="请选择新的模型：",
+            options=type_options,
+            default_index=type_options.index(old_model_type),
+            theme=self.theme
+        )
+        if dialog.exec_() != QDialog.Accepted:
+            return
+        new_model_type = dialog.get_value()
+        if new_model_type == old_model_type:
+            return
+        msg_box = MessageBox(
+            parent=self,
+            text=f"即将更改模型类型，原模型类型为：{old_model_type}，新模型类型为：{new_model_type}。修改模型类型后可能会导致模型无法加载，确定要继续吗？",
+            theme=self.theme,
+            addButton=False
+        )
+        msg_box.add_buttons({
+            "确定": QMessageBox.AcceptRole,
+            "取消": QMessageBox.RejectRole
+        })
+        msg_box.exec_()
+        if msg_box.get_clicked_button() == "取消":
+            return
+        result = ModelService.update_model_type(model_name, new_model_type)
+        if not result.success:
+            msg_box = MessageBox(
+                parent=self,
+                title="错误",
+                text=result.message,
+                icon=QMessageBox.Critical,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            return
+        msg_box = MessageBox(
+            parent=self,
+            title="提示",
+            text=result.message,
+            icon=QMessageBox.Information,
+            theme=self.theme
+        )
+        msg_box.exec_()
+        self.refresh()        
 
     def delete_model(self, model_name, model_dir):
         self.theme = self.get_current_theme()

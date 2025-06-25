@@ -1,5 +1,4 @@
-import os, shutil, zipfile, json, csv, re
-from threads.model_import_thread import ModelImportThread
+import os, shutil, zipfile, json, csv, re, datetime
 from convention.result import Result
 from convention.result_code import ResultCode
 
@@ -149,6 +148,7 @@ class ModelService:
                 if item_name != model_name or meta['description'] == description:
                     continue
                 meta['description'] = description
+                meta['update_time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 info[item_name] = meta
                 is_real_set = True
                 break
@@ -221,6 +221,7 @@ class ModelService:
             new_meta = old_meta.copy()
             new_meta['model_name'] = new_model_name
             new_meta['model_dir'] = new_dir
+            new_meta['update_time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             del info[old_model_name]
             info[new_model_name] = new_meta
@@ -256,3 +257,44 @@ class ModelService:
         
         base, date_str, _, hash_str = match.groups()
         return f"{base}{date_str}-{new_model_name}-{hash_str}"
+    
+    @staticmethod
+    def update_model_type(model_name, new_model_type):
+        model_info = ModelService.load_model_info()
+        if not model_info.success or model_info.code == ResultCode.NO_DATA:
+            return model_info
+        try:
+            is_updated_meta = False
+            info = model_info.data
+            old_meta = info[model_name]
+            model_dir = old_meta['model_dir']
+
+            meta_path = os.path.join(model_dir, 'meta.json')
+            meta_backup = None
+
+            if meta_path:
+                with open(meta_path, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                meta_backup = meta
+                meta['model_type'] = new_model_type
+                with open(meta_path, 'w', encoding='utf-8') as f:
+                    json.dump(meta, f, ensure_ascii=False, indent=2)
+                is_updated_meta = True
+            
+            old_meta['model_type'] = new_model_type
+            old_meta['update_time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            info[model_name] = old_meta
+            with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
+                json.dump(info, f, ensure_ascii=False, indent=2)
+            return Result.success(message="模型类型更新成功")
+        except Exception as e:
+            try:
+                if is_updated_meta:
+                    with open(meta_path, 'w', encoding='utf-8') as f:
+                        json.dump(meta_backup, f, ensure_ascii=False, indent=2)
+            except Exception as rollback_err:
+                return Result.fail(
+                    message=f"模型类型更新失败且回滚失败: {e}; 回滚错误: {rollback_err}",
+                    code=ResultCode.SERVER_ERROR
+                )
+            return Result.fail(message=f"模型类型更新失败: {e}", code=ResultCode.SERVER_ERROR)
