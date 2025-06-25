@@ -1,14 +1,11 @@
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QLabel, QScrollArea, QGroupBox, 
-    QHBoxLayout, QLineEdit, QFileDialog, QMessageBox, QMenu, QDialog
+    QHBoxLayout, QLineEdit, QFileDialog, QMessageBox, QMenu, QDialog,
+    QComboBox
 )
-from PyQt5.QtCore import QUrl, QPropertyAnimation, QEasingCurve, QSize, Qt, QTimer
+from PyQt5.QtCore import QUrl, QSize
 from PyQt5.QtGui import QDesktopServices, QIcon
-import json
-import csv
 import os
-import shutil
-import zipfile
 from threads.model_import_thread import ModelImportThread
 from widgets.message_box import MessageBox
 from widgets.input_dialog import InputDialog
@@ -22,6 +19,9 @@ class ModelListPanel(QWidget):
     def __init__(self, parent=None, theme='light'):
         super().__init__(parent)
         self.theme = theme
+        self.is_descending = True
+        self.sort_by = 'created_time'
+        self.current_model_info = {}
         self.setContentsMargins(20, 20, 20, 20)
         self.layout = QVBoxLayout(self)
 
@@ -33,6 +33,17 @@ class ModelListPanel(QWidget):
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("输入模型名称、类型、创建时间、备注以搜索")
         self.btn_search = QPushButton("搜索")
+        self.sort_type = QComboBox()
+        self.sort_type.addItems(['按创建时间排序', '按修改时间排序', '按模型名称排序'])
+        
+        self.btn_order = QPushButton()
+        if self.theme == 'light':
+            self.btn_order.setIcon(QIcon("assets/svg/descend_light.svg"))
+        else:
+            self.btn_order.setIcon(QIcon("assets/svg/descend_dark.svg"))
+        self.btn_order.setIconSize(QSize(28, 28))
+        self.btn_order.setFixedSize(36, 36)
+        self.btn_order.setStyleSheet("border:none; background:transparent;")
 
         self.btn_refresh = QPushButton()
         if self.theme == 'light':
@@ -64,6 +75,8 @@ class ModelListPanel(QWidget):
         self.hbox = QHBoxLayout()
         self.hbox.addWidget(self.search_box)
         self.hbox.addWidget(self.btn_search)
+        self.hbox.addWidget(self.sort_type)
+        self.hbox.addWidget(self.btn_order)
         self.hbox.addWidget(self.btn_refresh)
         self.hbox.addWidget(self.btn_upload)
         self.hbox.addWidget(self.btn_download)
@@ -74,6 +87,8 @@ class ModelListPanel(QWidget):
         self.btn_search.clicked.connect(self.search)
         self.btn_download.clicked.connect(self.download)
         self.btn_upload.clicked.connect(self.upload)
+        self.sort_type.currentIndexChanged.connect(self.on_sort_type_changed)
+        self.btn_order.clicked.connect(self.toggle_sort_order)
 
         self._pending_delete = None
 
@@ -87,36 +102,25 @@ class ModelListPanel(QWidget):
             parent = parent.parent()
         return theme
 
-    def refresh(self):
+    def update_model_list(self, info_dict: dict):
+        if self.sort_by in ['created_time', 'updated_time']:
+            sorted_items = sorted(
+                info_dict.items(),
+                key=lambda x: x[1].get(self.sort_by, ""),
+                reverse=self.is_descending
+            )
+        elif self.sort_by == 'model_name':
+            sorted_items = sorted(info_dict.items(), key=lambda x: x[0].lower(), reverse=self.is_descending)
+        else:
+            sorted_items = list(info_dict.items())
+        
         self.theme = self.get_current_theme()
         for i in reversed(range(self.inner_layout.count())):
             widget = self.inner_layout.itemAt(i).widget()
             if widget:
                 widget.deleteLater()
 
-        model_info = ModelService.load_model_info()
-        if not model_info.success:
-            msg_box = MessageBox(
-                parent=self,
-                title="错误",
-                text=model_info.message,
-                icon=QMessageBox.Critical,
-                theme=self.theme
-            )
-            msg_box.exec_()
-            return
-        if model_info.code == ResultCode.NO_DATA:
-            msg_box = MessageBox(
-                parent=self,
-                title="提示",
-                text=model_info.message,
-                icon=QMessageBox.Information,
-                theme = self.theme
-            )
-            msg_box.exec_()
-            return
-        
-        for model_name, meta in model_info.data.items():
+        for model_name, meta in sorted_items:
             model_type = meta.get("model_type", "未知")
             model_dir = meta.get("model_dir", "未知")
             created_time = meta.get("created_time", "未知")
@@ -163,6 +167,32 @@ class ModelListPanel(QWidget):
             vbox.addLayout(hbox)
             self.inner_layout.addWidget(group)
         self.inner_layout.addStretch()
+        
+
+    def refresh(self):
+        model_info = ModelService.load_model_info()
+        if not model_info.success:
+            msg_box = MessageBox(
+                parent=self,
+                title="错误",
+                text=model_info.message,
+                icon=QMessageBox.Critical,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            return
+        if model_info.code == ResultCode.NO_DATA:
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text=model_info.message,
+                icon=QMessageBox.Information,
+                theme = self.theme
+            )
+            msg_box.exec_()
+            return
+        self.current_model_info = model_info.data
+        self.update_model_list(self.current_model_info)
 
     def search(self):
         self.theme = self.get_current_theme()
@@ -170,11 +200,6 @@ class ModelListPanel(QWidget):
         if not keyword:
             self.refresh()
             return
-        
-        for i in reversed(range(self.inner_layout.count())):
-            widget = self.inner_layout.itemAt(i).widget()
-            if widget:
-                widget.deleteLater()
 
         model_info = ModelService.search_model(keyword)
         if not model_info.success:
@@ -198,54 +223,25 @@ class ModelListPanel(QWidget):
             msg_box.exec_()
             self.refresh()
             return
-        for model_name, meta in model_info.data.items():
-            model_type = meta.get("model_type", "未知")
-            created_time = meta.get("created_time", "未知")
-            update_time = meta.get("update_time", "未知")
-            model_dir = meta.get("model_dir", "未知")
-            description = meta.get("description", "未知")
-            
-            group = QGroupBox()
-            vbox = QVBoxLayout(group)
-            vbox.addWidget(QLabel(f"模型名称: {model_name}"))
-            vbox.addWidget(QLabel(f"模型类型: {model_type}"))
-            vbox.addWidget(QLabel(f"存放位置: {model_dir}"))
-            vbox.addWidget(QLabel(f"创建时间: {created_time}"))
-            vbox.addWidget(QLabel(f"修改时间: {update_time}"))
-            vbox.addWidget(QLabel(f"备注: {description}"))
-
-            hbox = QHBoxLayout()
-            btn_open = QPushButton("打开目录")
-            btn_open.clicked.connect(lambda _, d=model_dir: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(d))))
-            hbox.addWidget(btn_open)
-            btn_meta = QPushButton("查看模型元信息")
-            meta_json_path = os.path.abspath(os.path.join(model_dir, 'meta.json'))
-            if not os.path.exists(meta_json_path):
-                btn_meta.setEnabled(False)
-                btn_meta.setToolTip("没有模型元信息")
-            else:
-                btn_meta.setEnabled(True)
-            btn_meta.clicked.connect(lambda _, d=model_dir: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(os.path.join(d, 'meta.json')))))
-            hbox.addWidget(btn_meta)
-            btn_output = QPushButton("导出模型包")
-            if model_dir == '.':
-                btn_output.setEnabled(False)
-                btn_output.setToolTip("无法导出，因为模型存储在主文件夹")
-            else:
-                btn_output.setEnabled(True)
-            btn_output.clicked.connect(lambda m=model_name, d=model_dir: self.output_model(m, d))
-            hbox.addWidget(btn_output)
-            btn_more = QPushButton("更多")
-            menu = QMenu()
-            menu.addAction("重命名模型", lambda m=model_name: self.rename_model(m))
-            menu.addAction("设置备注", lambda m=model_name, d=description: self.set_description(m, d))
-            menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
-            btn_more.setMenu(menu)
-            hbox.addWidget(btn_more)
-            vbox.addLayout(hbox)
-            self.inner_layout.addWidget(group)
-        self.inner_layout.addStretch()
+        self.current_model_info = model_info.data
+        self.update_model_list(self.current_model_info)
     
+    def on_sort_type_changed(self, index):
+        mapping = {
+            0: "created_time",
+            1: "update_time",
+            2: "model_name"
+        }
+        self.sort_by = mapping.get(index, "created_time")
+        self.update_model_list(self.current_model_info)
+    
+    def toggle_sort_order(self):
+        self.theme = self.get_current_theme()
+        self.is_descending = not self.is_descending
+        icon_path = f"assets/svg/{'descend' if self.is_descending else 'ascend'}_{self.theme}.svg"
+        self.btn_order.setIcon(QIcon(icon_path))
+        self.update_model_list(self.current_model_info)
+
     def download(self):
         try:
             self.theme = self.get_current_theme()

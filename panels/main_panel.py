@@ -118,6 +118,10 @@ class MainPanelWindow(QWidget):
         if self.current_theme == "light":
             load_qss(app, DARK_QSS_FILE)
             self.btn_theme.setIcon(QIcon("assets/svg/sun.svg"))
+            if self.model_list_panel.is_descending:
+                self.model_list_panel.btn_order.setIcon(QIcon("assets/svg/descend_dark.svg"))
+            else:
+                self.model_list_panel.btn_order.setIcon(QIcon("assets/svg/ascend_dark.svg"))
             self.model_list_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.model_list_panel.btn_download.setIcon(QIcon("assets/svg/download_dark.svg"))
             self.model_list_panel.btn_upload.setIcon(QIcon("assets/svg/upload_dark.svg"))
@@ -133,6 +137,10 @@ class MainPanelWindow(QWidget):
         else:
             load_qss(app, LIGHT_QSS_FILE)
             self.btn_theme.setIcon(QIcon("assets/svg/moon.svg"))
+            if self.model_list_panel.is_descending:
+                self.model_list_panel.btn_order.setIcon(QIcon("assets/svg/descend_light.svg"))
+            else:
+                self.model_list_panel.btn_order.setIcon(QIcon("assets/svg/ascend_light.svg"))
             self.model_list_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.model_list_panel.btn_download.setIcon(QIcon("assets/svg/download_light.svg"))
             self.model_list_panel.btn_upload.setIcon(QIcon("assets/svg/upload_light.svg"))
