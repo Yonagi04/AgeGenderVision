@@ -91,6 +91,11 @@ class MainPanelWindow(QWidget):
         self.btn_theme.clicked.connect(self.toggle_theme)
         self.switch_panel(0)
 
+    def closeEvent(self, event):
+        if self.model_list_panel.viewer:
+            self.model_list_panel.viewer.stop()
+            event.accept()
+
     def switch_panel(self, idx):
         if idx != self.current_panel_idx:
             if idx == 0 and not self.train_panel.is_running:

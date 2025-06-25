@@ -10,6 +10,7 @@ from threads.model_import_thread import ModelImportThread
 from widgets.message_box import MessageBox
 from widgets.input_dialog import InputDialog
 from widgets.select_dialog import SelectDialog
+from widgets.netron_viewer import NetronLocalBrowserViewer
 from services.model_service import ModelService
 from convention.result_code import ResultCode
 
@@ -22,6 +23,7 @@ class ModelListPanel(QWidget):
         self.is_descending = True
         self.sort_by = 'created_time'
         self.current_model_info = {}
+        self.viewer = None
         self.setContentsMargins(20, 20, 20, 20)
         self.layout = QVBoxLayout(self)
 
@@ -160,6 +162,7 @@ class ModelListPanel(QWidget):
             menu.addAction("重命名模型", lambda m=model_name: self.rename_model(m))
             menu.addAction("设置备注", lambda m=model_name,d=description: self.set_description(m, d))
             menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
+            menu.addAction("查看模型结构", lambda m=model_name: self.view_model_structure(m))
             menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
             btn_more.setMenu(menu)
             hbox.addWidget(btn_more)
@@ -532,3 +535,42 @@ class ModelListPanel(QWidget):
         )
         msg_box.exec_()
         self.refresh()
+
+    def view_model_structure(self, model_name):
+        self.theme = self.get_current_theme()
+        ask_box = MessageBox(
+            parent=self,
+            text="查看模型结构需要安装 netron 依赖，确定要查看模型结构吗？",
+            theme=self.theme,
+            addButton=False
+        )
+        ask_box.add_buttons({
+            "确定": QMessageBox.AcceptRole,
+            "取消": QMessageBox.RejectRole
+        })
+        ask_box.exec_()
+        user_choice = ask_box.get_clicked_button()
+        if user_choice == '取消':
+            return
+        result = ModelService.get_model_save_path(model_name)
+        if not result.success:
+            msg_box = MessageBox(
+                parent=self,
+                text=result.message,
+                title='错误',
+                theme=self.theme,
+                icon=QMessageBox.Critical
+            )
+            msg_box.exec_()
+            return
+        if result.code == ResultCode.NO_DATA:
+            msg_box = MessageBox(
+                parent=self,
+                text=result.message,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            return
+        save_path = result.data
+        self.viewer = NetronLocalBrowserViewer(save_path)
+        self.viewer.start()

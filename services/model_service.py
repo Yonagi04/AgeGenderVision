@@ -298,3 +298,17 @@ class ModelService:
                     code=ResultCode.SERVER_ERROR
                 )
             return Result.fail(message=f"模型类型更新失败: {e}", code=ResultCode.SERVER_ERROR)
+        
+    @staticmethod
+    def get_model_save_path(model_name):
+        model_info = ModelService.load_model_info()
+        if not model_info or model_info.code == ResultCode.NO_DATA:
+            return model_info
+        info = model_info.data
+        meta = info[model_name]
+        model_dir = meta['model_dir']
+        save_path = os.path.join(model_dir, model_name)
+        if not os.path.exists(save_path):
+            return Result.fail("模型文件不存在", code=ResultCode.NOT_FOUND)
+        return Result.success(data = save_path)
+        
