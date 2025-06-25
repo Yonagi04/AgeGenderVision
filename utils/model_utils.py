@@ -98,6 +98,7 @@ def gen_model_dir(model_type, model_name, save_dir="models"):
         model_name = model_name[:-3]
     folder_name = f"{date_str}-{model_name}-{unique_id}"
     folder_path = os.path.join(save_dir, folder_name)
+    folder_path.replace("\\", "/")
     os.makedirs(folder_path, exist_ok=True)
     return folder_path
 
