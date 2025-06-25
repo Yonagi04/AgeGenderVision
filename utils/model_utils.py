@@ -146,3 +146,56 @@ def save_model(model_type, model_name, model):
         return True
     except Exception as e:
         return False
+    
+# 工厂方法延迟导入torch和定义类
+def create_multitask_resnet(model_type='resnet18'):
+    import torch.nn as nn
+    from torchvision import models
+
+    class MultiTaskResNet(nn.Module):
+        def __init__(self):
+            super().__init__()
+            if model_type == 'resnet18':
+                self.backbone = models.resnet18(weights=None)
+            elif model_type == 'resnet34':
+                self.backbone = models.resnet34(weights=None)
+            elif model_type == 'resnet50':
+                self.backbone = models.resnet50(weights=None)
+            else:
+                raise ValueError(f"不支持的模型类型: {model_type}")
+            num_ftrs = self.backbone.fc.in_features
+            self.backbone.fc = nn.Identity()
+            self.age_head = nn.Linear(num_ftrs, 1)
+            self.gender_head = nn.Linear(num_ftrs, 2)
+
+        def forward(self, x):
+            feat = self.backbone(x)
+            age = self.age_head(feat).squeeze(1)
+            gender = self.gender_head(feat)
+            return age, gender
+
+    return MultiTaskResNet()
+
+
+# 模型导出为ONNX
+def output_model_onnx(model_dir, model_name, model_type):
+    import torch
+    from torchvision import models
+
+    input_shape=(1, 3, 224, 224)
+
+    model_path = os.path.join(model_dir, model_name)
+    model_cls = getattr(models, model_type)
+    model = create_multitask_resnet(model_type)
+    model.load_state_dict(torch.load(model_path, map_location="cpu", weights_only=True))
+    model.eval()
+
+    onnx_name = os.path.splitext(model_name)[0] + ".onnx"
+    onnx_path = os.path.join(model_dir, onnx_name)
+    dummy_input = torch.randn(*input_shape)
+
+    try:
+        torch.onnx.export(model, dummy_input, onnx_path, opset_version=11)
+        return True
+    except Exception as e:
+        return False

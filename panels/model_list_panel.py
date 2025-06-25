@@ -5,8 +5,9 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QUrl, QSize
 from PyQt5.QtGui import QDesktopServices, QIcon
-import os
+import os, zipfile
 from threads.model_import_thread import ModelImportThread
+from threads.model_output_onnx_thread import ModelOutputOnnxThread
 from widgets.message_box import MessageBox
 from widgets.input_dialog import InputDialog
 from widgets.select_dialog import SelectDialog
@@ -163,6 +164,7 @@ class ModelListPanel(QWidget):
             menu.addAction("设置备注", lambda m=model_name,d=description: self.set_description(m, d))
             menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
             menu.addAction("查看模型结构", lambda m=model_name: self.view_model_structure(m))
+            menu.addAction("导出为 ONNX", lambda m=model_name, d=model_dir,t=model_type: self.output_model_onnx(m, d, t))
             menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
             btn_more.setMenu(menu)
             hbox.addWidget(btn_more)
@@ -326,8 +328,8 @@ class ModelListPanel(QWidget):
         self.thread.start()
 
     def on_model_import_finished(self, success, msg):
-        self.theme = self.get_current_theme()
         self.btn_upload.setEnabled(True)
+        self.thread = None
         if success:
             self.refresh()
         self.theme = self.get_current_theme()
@@ -495,6 +497,81 @@ class ModelListPanel(QWidget):
         msg_box.exec_()
         self.refresh()        
 
+    def output_model_onnx(self, model_name, model_dir, model_type):
+        save_path = os.path.join(model_dir, model_name)
+        if not os.path.exists(save_path):
+            msg_box = MessageBox(
+                parent=self,
+                title="错误",
+                text="模型文件不存在",
+                icon=QMessageBox.Critical,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            return
+        msg_box = MessageBox(
+            parent=self,
+            text="正在导出ONNX，需要一些时间，请稍候...",
+            theme=self.theme
+        )
+        msg_box.show()
+        self.thread = ModelOutputOnnxThread(model_dir, model_name, model_type)
+        self.thread.finished.connect(self.output_model_onnx_finished)
+        self.thread.start()
+
+    def output_model_onnx_finished(self, success, msg):
+        self.theme = self.get_current_theme()
+        model_name = self.thread.model_name
+        model_dir = self.thread.model_dir
+        onnx_name = os.path.splitext(model_name)[0] + ".onnx"
+        onnx_path = os.path.join(model_dir, onnx_name)
+
+        self.thread = None
+
+        if not success or not os.path.exists(onnx_path):
+            msg_box = MessageBox(
+                parent=self,
+                title="错误",
+                text="模型转换失败",
+                icon=QMessageBox.Critical,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            return
+        try:
+            zip_filename = f"{onnx_name}_export.zip"
+            zip_path = os.path.join("exports", zip_filename)
+            os.makedirs("exports", exist_ok=True)
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:    
+                zf.write(onnx_path, arcname=onnx_name)
+                meta_path = os.path.join(model_dir, "meta.json")
+                if os.path.exists(meta_path):
+                    zf.write(meta_path, arcname="meta.json")
+
+                for img_name in ['age_scatter.png', 'gender_confusion.png']:
+                    img_path = os.path.join(model_dir, img_name)
+                    if os.path.exists(img_path):
+                        zf.write(img_path, arcname=img_name)
+            os.remove(onnx_path)
+            msg_box = MessageBox(
+                parent=self,
+                title="提示",
+                text="导出成功",
+                icon=QMessageBox.Information,
+                theme=self.theme
+            )
+            msg_box.exec_()
+            QDesktopServices.openUrl(QUrl.fromLocalFile(zip_path))
+        except Exception as e:
+            msg_box = MessageBox(
+                parent=self,
+                title="错误",
+                text=f"导出失败: {e}",
+                icon=QMessageBox.Critical,
+                theme=self.theme
+            )
+            msg_box.exec_()
+        
     def delete_model(self, model_name, model_dir):
         self.theme = self.get_current_theme()
         dialog = InputDialog(
