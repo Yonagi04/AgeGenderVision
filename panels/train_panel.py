@@ -148,11 +148,13 @@ class TrainPanel(QWidget):
                                     info = json.load(f)
                             else:
                                 info = {}
+                            timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                             info[model_path] = {
                                 "model_name": model_path,
                                 "model_type": model_type,
                                 "model_dir": last_model_dir,
-                                "created_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "created_time": timestamp,
+                                "update_time": timestamp,
                                 "description": "Created by AgeGenderVision"
                             }
                             with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:

@@ -132,11 +132,14 @@ def save_model(model_type, model_name, model):
                 info = json.load(f)
         else:
             info = {}
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         info[model_name] = {
             "model_name": model_name,
             "model_type": model_type,
             "model_dir": model_dir,
-            "created_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            "created_time": timestamp,
+            "update_time": timestamp,
+            "description": "Updated by user"
         }
         with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
             json.dump(info, f, ensure_ascii=False, indent=2)
