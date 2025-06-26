@@ -114,25 +114,34 @@ class ModelService:
             return Result.fail(f"导出过程出错: {e}", {}, code=ResultCode.SERVER_ERROR)
 
     @staticmethod
-    def output_model(model_name, model_dir):
+    def output_model(model_name, model_dir, user_choice):
         try:
-            zip_filename = f"{model_name}_export.zip"
-            zip_path = os.path.join("exports", zip_filename)
             os.makedirs("exports", exist_ok=True)
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                model_path = os.path.join(model_dir, model_name)
+            model_path = os.path.join(model_dir, model_name)
+            if user_choice == 'ZIP':
+                zip_filename = f"{model_name}_export.zip"
+                zip_path = os.path.join("exports", zip_filename)
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    if os.path.exists(model_path):
+                        zf.write(model_path, arcname=model_name)
+
+                    meta_path = os.path.join(model_dir, "meta.json")
+                    if os.path.exists(meta_path):
+                        zf.write(meta_path, arcname="meta.json")
+
+                    for img_name in ['age_scatter.png', 'gender_confusion.png']:
+                        img_path = os.path.join(model_dir, img_name)
+                        if os.path.exists(img_path):
+                            zf.write(img_path, arcname=img_name)
+                return Result.success(data = zip_path)
+            elif user_choice == 'PTH':
                 if os.path.exists(model_path):
-                    zf.write(model_path, arcname=model_name)
-
-                meta_path = os.path.join(model_dir, "meta.json")
-                if os.path.exists(meta_path):
-                    zf.write(meta_path, arcname="meta.json")
-
-                for img_name in ['age_scatter.png', 'gender_confusion.png']:
-                    img_path = os.path.join(model_dir, img_name)
-                    if os.path.exists(img_path):
-                        zf.write(img_path, arcname=img_name)
-            return Result.success(data = zip_path)
+                    dest_path = os.path.join("exports", model_name)
+                    shutil.copy2(model_path, dest_path)
+                    return Result.success(data=dest_path)
+                    
+            else:
+                return Result.fail("不受支持的协议", code=ResultCode.PANEL_ERROR)
         except Exception as e:
             return Result.fail(f"导出失败: {e}")
         

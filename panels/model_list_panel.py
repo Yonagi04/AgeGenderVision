@@ -1,13 +1,14 @@
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QLabel, QScrollArea, QGroupBox, 
     QHBoxLayout, QLineEdit, QFileDialog, QMessageBox, QMenu, QDialog,
-    QComboBox
+    QComboBox, QAction
 )
 from PyQt5.QtCore import QUrl, QSize
 from PyQt5.QtGui import QDesktopServices, QIcon
 import os
 import zipfile
 import copy
+import shutil
 from threads.model_import_thread import ModelImportThread
 from threads.model_output_onnx_thread import ModelOutputOnnxThread
 from widgets.message_box import MessageBox
@@ -185,22 +186,26 @@ class ModelListPanel(QWidget):
                 btn_meta.setEnabled(True)
             btn_meta.clicked.connect(lambda _, d=model_dir: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(os.path.join(d, 'meta.json')))))
             hbox.addWidget(btn_meta)
-            btn_output = QPushButton("导出模型包")
+            btn_export = QPushButton("导出模型")
             if model_dir == '.':
-                btn_output.setEnabled(False)
-                btn_output.setToolTip("无法导出，因为模型存储在主文件夹")
+                btn_export.setEnabled(False)
+                btn_export.setToolTip("无法导出，因为模型存储在主文件夹")
             else:
-                btn_output.setEnabled(True)
-            btn_output.clicked.connect(lambda _, m=model_name, d=model_dir: self.output_model(m, d))
-            hbox.addWidget(btn_output)
+                btn_export.setEnabled(True)
+            menu_export = QMenu()
+            menu_export.addAction("导出为 PTH", lambda m=model_name, d=model_dir: self.output_model(m, d))
+            menu_export.addAction("导出为 ONNX", lambda m=model_name, d=model_dir, t=model_type: self.output_model_onnx(m, d, t))
+            btn_export.setMenu(menu_export)
+
+            hbox.addWidget(btn_export)
+
             btn_more = QPushButton("更多")
             menu = QMenu()
             menu.addAction("重命名模型", lambda m=model_name: self.rename_model(m))
             menu.addAction("设置备注", lambda m=model_name,d=description: self.set_description(m, d))
-            menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
             menu.addAction("设置标签", lambda m=model_name, t=tags: self.set_tags(m, t))
+            menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
             menu.addAction("查看模型结构", lambda m=model_name: self.view_model_structure(m))
-            menu.addAction("导出为 ONNX", lambda m=model_name, d=model_dir,t=model_type: self.output_model_onnx(m, d, t))
             menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
             btn_more.setMenu(menu)
             hbox.addWidget(btn_more)
@@ -385,7 +390,23 @@ class ModelListPanel(QWidget):
 
     def output_model(self, model_name, model_dir):
         self.theme = self.get_current_theme()
-        result = ModelService.output_model(model_name, model_dir)
+        ask_box = MessageBox(
+            parent=self,
+            title="提示",
+            text="请选择导出格式（zip/pth）",
+            theme=self.theme,
+            addButton=False
+        )
+        ask_box.add_buttons({
+            "ZIP": QMessageBox.AcceptRole,
+            "PTH": QMessageBox.AcceptRole,
+            "取消": QMessageBox.RejectRole
+        })
+        ask_box.exec_()
+        user_choice = ask_box.get_clicked_button()
+        if user_choice not in ['ZIP', 'PTH']:
+            return
+        result = ModelService.output_model(model_name, model_dir, user_choice)
         if not result.success:
             msg_box = MessageBox(
                 parent=self,
@@ -395,7 +416,7 @@ class ModelListPanel(QWidget):
                 icon=QMessageBox.Critical
             )
             msg_box.exec_()
-        zip_path = result.data
+        path = result.data
         msg_box = MessageBox(
             parent=self,
             title="提示",
@@ -404,7 +425,10 @@ class ModelListPanel(QWidget):
             icon=QMessageBox.Information
         )
         msg_box.exec_()
-        QDesktopServices.openUrl(QUrl.fromLocalFile(zip_path))
+        if user_choice == 'ZIP':
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        else:
+            QDesktopServices.openUrl(QUrl.fromLocalFile("exports"))
         
     def rename_model(self, old_model_name):
         self.theme = self.get_current_theme()
@@ -579,20 +603,10 @@ class ModelListPanel(QWidget):
             )
             msg_box.exec_()
             return
+        
         try:
-            zip_filename = f"{onnx_name}_export.zip"
-            zip_path = os.path.join("exports", zip_filename)
-            os.makedirs("exports", exist_ok=True)
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:    
-                zf.write(onnx_path, arcname=onnx_name)
-                meta_path = os.path.join(model_dir, "meta.json")
-                if os.path.exists(meta_path):
-                    zf.write(meta_path, arcname="meta.json")
-
-                for img_name in ['age_scatter.png', 'gender_confusion.png']:
-                    img_path = os.path.join(model_dir, img_name)
-                    if os.path.exists(img_path):
-                        zf.write(img_path, arcname=img_name)
+            dest_path = os.path.join("exports", onnx_name)
+            shutil.copy2(onnx_path, dest_path)
             os.remove(onnx_path)
             msg_box = MessageBox(
                 parent=self,
@@ -602,7 +616,7 @@ class ModelListPanel(QWidget):
                 theme=self.theme
             )
             msg_box.exec_()
-            QDesktopServices.openUrl(QUrl.fromLocalFile(zip_path))
+            QDesktopServices.openUrl(QUrl.fromLocalFile("exports"))
         except Exception as e:
             msg_box = MessageBox(
                 parent=self,
