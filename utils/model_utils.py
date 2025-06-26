@@ -139,7 +139,15 @@ def save_model(model_type, model_name, model):
             "model_dir": model_dir,
             "created_time": timestamp,
             "update_time": timestamp,
-            "description": "Updated by user"
+            "description": "Updated by user",
+            "tags": [],
+            "eval_result": {
+                "val_age_loss": "",
+                "val_gender_loss": "",
+                "val_acc": "",
+                "age_scatter_image": "",
+                "gender_confusion_image": ""
+            }
         }
         with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
             json.dump(info, f, ensure_ascii=False, indent=2)
