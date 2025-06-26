@@ -169,7 +169,7 @@ QGroupBox:title {
 /* 模型信息文本 */
 QGroupBox QLabel {
     color: #222;
-    font-size: 16px;
+    font-size: 18px;
     padding: 2px 0;
 }
 
@@ -180,7 +180,7 @@ QGroupBox QPushButton {
     border: 1px solid #d1d5db;
     border-radius: 8px;
     padding: 6px 18px;
-    font-size: 15px;
+    font-size: 18px;
     margin-right: 12px;
 }
 QGroupBox QPushButton:hover {
