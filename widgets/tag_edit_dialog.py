@@ -4,16 +4,22 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
+import copy
+from widgets.flow_layout import FlowLayout
 
 class TagEditDialog(QDialog):
-    def __init__(self, tags=None, theme="light", parent=None):
+    def __init__(self, tags=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("标签编辑")
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setMinimumWidth(400)
-        self.tags = tags if tags else []  # [{'text': 'xxx', 'color': '#ff0000'}]
-        self.theme = theme
+        self.tags = copy.deepcopy(tags) if tags else []
         self.new_tags = []
+        self.quick_tags = [
+            {"text": "实验模型", "color": "#42a5f5"},
+            {"text": "正式模型", "color": "#66bb6a"},
+            {"text": "临时测试", "color": "#ffa726"}
+        ]
 
         self.layout = QVBoxLayout(self)
         self.tag_area = QScrollArea()
@@ -21,6 +27,32 @@ class TagEditDialog(QDialog):
         self.tag_layout = QGridLayout(self.tag_container)
         self.tag_area.setWidgetResizable(True)
         self.tag_area.setWidget(self.tag_container)
+
+        self.layout.addWidget(QLabel("快捷标签:"))
+        quick_tag_widget = QWidget()
+        quick_tag_layout = FlowLayout(spacing=6)
+        for tag in self.quick_tags:
+            label = QLabel(tag["text"])
+            color = tag["color"]
+            text_color = self.get_contrast_font_color(color)
+            label.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {color};
+                    color: {text_color};
+                    border-radius: 6px;
+                    padding: 2px 6px;
+                    font-size: 14px;
+                    min-height: 30px;
+                    max-height: 40px
+                }}
+            """)
+            label.setFixedHeight(24)
+            label.setCursor(Qt.PointingHandCursor)
+            label.mousePressEvent = self.make_quick_tag_handler(tag)
+            quick_tag_layout.addWidget(label)
+        quick_tag_widget.setLayout(quick_tag_layout)
+        self.layout.addWidget(quick_tag_widget)
+
         self.layout.addWidget(QLabel("已有标签:"))
         self.layout.addWidget(self.tag_area)
 
@@ -99,3 +131,16 @@ class TagEditDialog(QDialog):
 
     def get_tags(self):
         return self.tags
+
+    def make_quick_tag_handler(self, tag):
+        def handler(event):
+            if tag not in self.tags:
+                self.tags.append(tag.copy())
+                self.refresh_tags()
+        return handler
+    
+    def get_contrast_font_color(self, bg_color: str):
+        bg_color = bg_color.lstrip("#")
+        r, g, b = int(bg_color[0:2], 16), int(bg_color[2:4], 16), int(bg_color[4:6], 16)
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b)
+        return "#000000" if luminance > 186 else "#ffffff"
