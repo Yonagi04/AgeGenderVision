@@ -101,10 +101,10 @@ class TrainPanel(QWidget):
         cmd = [
             sys.executable,
             "train_age_gender_multitask.py",
-            "--batch_size", batch_size,
-            "--epochs", epochs,
-            "--lr", lr,
-            "--img_size", img_size,
+            "--batch_size", str(batch_size),
+            "--epochs", str(epochs),
+            "--lr", str(lr),
+            "--img_size", str(img_size),
             "--data_dir", data_dir,
             "--model_type", model_type,
             "--model_path", model_path
@@ -172,7 +172,7 @@ class TrainPanel(QWidget):
                                 "update_time": timestamp,
                                 "description": "Created by AgeGenderVision",
                                 "tags": tags,
-                                "evel_result": eval_result
+                                "eval_result": eval_result
                             }
                             with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
                                 json.dump(info, f, ensure_ascii=False, indent=2)
