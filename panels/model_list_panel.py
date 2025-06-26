@@ -5,13 +5,17 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import QUrl, QSize
 from PyQt5.QtGui import QDesktopServices, QIcon
-import os, zipfile
+import os
+import zipfile
+import copy
 from threads.model_import_thread import ModelImportThread
 from threads.model_output_onnx_thread import ModelOutputOnnxThread
 from widgets.message_box import MessageBox
 from widgets.input_dialog import InputDialog
 from widgets.select_dialog import SelectDialog
 from widgets.netron_viewer import NetronLocalBrowserViewer
+from widgets.tag_edit_dialog import TagEditDialog
+from widgets.flow_layout import FlowLayout
 from services.model_service import ModelService
 from convention.result_code import ResultCode
 
@@ -129,6 +133,7 @@ class ModelListPanel(QWidget):
             created_time = meta.get("created_time", "未知")
             update_time = meta.get("update_time", "未知")
             description = meta.get("description", "未知")
+            tags = meta.get("tags", [])
             group = QGroupBox()
             vbox = QVBoxLayout(group)
             vbox.addWidget(QLabel(f"模型名称: {model_name}"))
@@ -137,6 +142,36 @@ class ModelListPanel(QWidget):
             vbox.addWidget(QLabel(f"创建时间: {created_time}"))
             vbox.addWidget(QLabel(f"更新时间: {update_time}"))
             vbox.addWidget(QLabel(f"备注: {description}"))
+
+            if tags:
+                flow = FlowLayout(spacing=6)
+                for tag in tags:
+                    label = QLabel(tag["text"])
+                    color = tag["color"]
+                    text_color = self.get_contrast_font_color(color)
+                    label.setStyleSheet(f"""
+                            QLabel {{
+                                background-color: {color};
+                                color: {text_color};
+                                border-radius: 6px;
+                                padding: 2px 6px;
+                                font-size: 16px;
+                                min-height: 30px;
+                                max-height: 40px;
+                            }}
+                        """)
+                    label.setFixedHeight(24)
+                    flow.addWidget(label)
+
+                tag_container = QWidget()
+                tag_container.setLayout(flow)
+                tag_container.setStyleSheet("background-color: transparent;")
+                vbox.addWidget(tag_container)
+            else:
+                label_no_tag = QLabel("无标签")
+                label_no_tag.setStyleSheet("color: gray; font-size: 18px;")
+                vbox.addWidget(label_no_tag)
+
             hbox = QHBoxLayout()
             btn_open = QPushButton("打开目录")
             btn_open.clicked.connect(lambda _, d=model_dir: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(d))))
@@ -163,6 +198,7 @@ class ModelListPanel(QWidget):
             menu.addAction("重命名模型", lambda m=model_name: self.rename_model(m))
             menu.addAction("设置备注", lambda m=model_name,d=description: self.set_description(m, d))
             menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
+            menu.addAction("设置标签", lambda m=model_name, t=tags: self.set_tags(m, t))
             menu.addAction("查看模型结构", lambda m=model_name: self.view_model_structure(m))
             menu.addAction("导出为 ONNX", lambda m=model_name, d=model_dir,t=model_type: self.output_model_onnx(m, d, t))
             menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
@@ -173,6 +209,11 @@ class ModelListPanel(QWidget):
             self.inner_layout.addWidget(group)
         self.inner_layout.addStretch()
         
+    def get_contrast_font_color(self, bg_color: str):
+        bg_color = bg_color.lstrip("#")
+        r, g, b = int(bg_color[0:2], 16), int(bg_color[2:4], 16), int(bg_color[4:6], 16)
+        luminance = (0.299 * r + 0.587 * g + 0.114 * b)
+        return "#000000" if luminance > 186 else "#ffffff"
 
     def refresh(self):
         model_info = ModelService.load_model_info()
@@ -572,6 +613,44 @@ class ModelListPanel(QWidget):
             )
             msg_box.exec_()
         
+    def set_tags(self, model_name, tags):
+        self.theme = self.get_current_theme()
+        old_tags = copy.deepcopy(tags)
+        dialog = TagEditDialog(tags=old_tags)
+        if dialog.exec_():
+            new_tags = dialog.get_tags()
+            if new_tags == old_tags:
+                return
+            result = ModelService.update_model_tags(model_name, new_tags)
+            if not result.success:
+                msg = MessageBox(
+                    parent=self,
+                    title="错误",
+                    text=result.message,
+                    icon=QMessageBox.Critical,
+                    theme=self.theme
+                )
+                msg.exec_()
+                return
+            if result.code == ResultCode.NO_DATA:
+                msg = MessageBox(
+                    parent=self,
+                    text=result.message,
+                    theme=self.theme
+                )
+                msg.exec_()
+                return
+            msg = MessageBox(
+                parent=self,
+                text=result.message,
+                theme=self.theme
+            )
+            msg.exec_()
+            if self.search_box.text().strip():
+                self.search()
+            else:
+                self.refresh()
+
     def delete_model(self, model_name, model_dir):
         self.theme = self.get_current_theme()
         dialog = InputDialog(

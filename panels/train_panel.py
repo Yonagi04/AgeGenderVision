@@ -143,6 +143,11 @@ class TrainPanel(QWidget):
                 else:
                     if os.path.exists(os.path.join(last_model_dir, model_path)):
                         try:
+                            meta_path = os.path.join(last_model_dir, 'meta.json')
+                            if os.path.exists(meta_path):
+                                with open(meta_path, 'r', encoding='utf-8') as f:
+                                    meta = json.load(f)
+                            tags = meta['tags'] if meta else []
                             if os.path.exists(MODELS_INFO_FILE):
                                 with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
                                     info = json.load(f)
@@ -155,10 +160,16 @@ class TrainPanel(QWidget):
                                 "model_dir": last_model_dir,
                                 "created_time": timestamp,
                                 "update_time": timestamp,
-                                "description": "Created by AgeGenderVision"
+                                "description": "Created by AgeGenderVision",
+                                "tags": tags
                             }
                             with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
                                 json.dump(info, f, ensure_ascii=False, indent=2)
+                            if meta:
+                                del meta['tags']
+                            with open(meta_path, 'w', encoding='utf-8') as f:
+                                json.dump(meta, f, ensure_ascii=False, indent=2)
+                            os.remove(MODEL_DIR_FLAG)
                         except Exception as e:
                             self.log_text.append(f"模型信息写入失败：{e}")
                     else:

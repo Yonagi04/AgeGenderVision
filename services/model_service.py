@@ -302,7 +302,7 @@ class ModelService:
     @staticmethod
     def get_model_save_path(model_name):
         model_info = ModelService.load_model_info()
-        if not model_info or model_info.code == ResultCode.NO_DATA:
+        if not model_info.success or model_info.code == ResultCode.NO_DATA:
             return model_info
         info = model_info.data
         meta = info[model_name]
@@ -312,3 +312,19 @@ class ModelService:
             return Result.fail("模型文件不存在", code=ResultCode.NOT_FOUND)
         return Result.success(data = save_path)
         
+    @staticmethod
+    def update_model_tags(model_name, model_tags):
+        model_info = ModelService.load_model_info()
+        if not model_info.success or model_info.code == ResultCode.NO_DATA:
+            return model_info
+        try:
+            info = model_info.data
+            meta = info[model_name]
+            meta['tags'] = model_tags
+            meta['update_time'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            info[model_name] = meta
+            with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
+                json.dump(info, f, ensure_ascii=False, indent=2)
+            return Result.success("模型标签更新成功")
+        except Exception as e:
+            return Result.fail(message=f"模型标签更新失败: {e}")

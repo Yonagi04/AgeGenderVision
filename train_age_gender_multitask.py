@@ -148,6 +148,7 @@ def save_model(model_type, model_path, model, loader, device, epochs, batch_size
         model_save_path = os.path.join(model_dir, model_path)
         torch.save(model.state_dict(), model_save_path)
         save_img(model, model_dir, loader, device)
+        tags = generate_auto_tags(batch_size, epochs, img_size, val_age_loss, val_gender_loss, val_acc)
         meta = {
             "model_name": model_path,
             "model_type": model_type,
@@ -162,7 +163,8 @@ def save_model(model_type, model_path, model, loader, device, epochs, batch_size
                 "val_acc": float(val_acc),
                 "age_scatter_image": "age_scatter.png",
                 "gender_confusion_image": "gender_confusion.png"
-            }
+            },
+            "tags": tags
         }
         meta_path = os.path.join(model_dir, "meta.json")
         with open(meta_path, "w", encoding='utf-8') as f:
@@ -210,6 +212,34 @@ def save_img(model, model_dir, loader, device):
         plt.close()
     except Exception as e:
         save_error_log(e)
+
+def generate_auto_tags(batch_size, epochs, img_size, val_age_loss, val_gender_loss, val_acc):
+    tags = []
+    
+    if batch_size >= 128:
+        tags.append({"text": "大批量", "color": "#13c100"})
+    elif batch_size <= 32:
+        tags.append({"text": "小批量", "color": "#0077c1"})
+
+    if epochs <= 10:
+        tags.append({"text": "短周期训练", "color": "#3bd5b1"})
+    elif epochs >= 30:
+        tags.append({"text": "长周期训练", "color": "#3e96e4"})
+
+    if val_gender_loss < 0.35:
+        tags.append({"text": "性别识别优秀", "color": "#26c6da"})
+    elif val_gender_loss > 0.6:
+        tags.append({"text": "性别识别欠佳", "color": "#ff7043"})
+
+    if val_acc > 0.85:
+        tags.append({"text": "性别准确率85+", "color": "#00acc1"})
+
+    if val_age_loss < 50:
+        tags.append({"text": "年龄估计稳定", "color": "#9ccc65"})
+    elif val_age_loss > 100:
+        tags.append({"text": "年龄估计偏差大", "color": "#e53935"})
+
+    return tags
 
 def dummy_handler(signum, frame):
     print("非命令行环境下，屏蔽Ctrl+C（KeyboardInterrupt），请通过UI停止训练。")
