@@ -148,6 +148,13 @@ class TrainPanel(QWidget):
                                 with open(meta_path, 'r', encoding='utf-8') as f:
                                     meta = json.load(f)
                             tags = meta['tags'] if meta else []
+                            eval_result = meta['eval_result'] if meta else {
+                                "val_age_loss": "",
+                                "val_gender_loss": "",
+                                "val_acc": "",
+                                "age_scatter_image": "",
+                                "gender_confusion_image": ""
+                            }
                             if os.path.exists(MODELS_INFO_FILE):
                                 with open(MODELS_INFO_FILE, 'r', encoding='utf-8') as f:
                                     info = json.load(f)
@@ -161,7 +168,8 @@ class TrainPanel(QWidget):
                                 "created_time": timestamp,
                                 "update_time": timestamp,
                                 "description": "Created by AgeGenderVision",
-                                "tags": tags
+                                "tags": tags,
+                                "evel_result": eval_result
                             }
                             with open(MODELS_INFO_FILE, 'w', encoding='utf-8') as f:
                                 json.dump(info, f, ensure_ascii=False, indent=2)
