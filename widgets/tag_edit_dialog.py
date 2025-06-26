@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor
 import copy
 from widgets.flow_layout import FlowLayout
+from utils.ui_utils import get_contrast_font_color
 
 class TagEditDialog(QDialog):
     def __init__(self, tags=None, parent=None):
@@ -34,7 +35,7 @@ class TagEditDialog(QDialog):
         for tag in self.quick_tags:
             label = QLabel(tag["text"])
             color = tag["color"]
-            text_color = self.get_contrast_font_color(color)
+            text_color = get_contrast_font_color(color)
             label.setStyleSheet(f"""
                 QLabel {{
                     background-color: {color};
@@ -138,9 +139,3 @@ class TagEditDialog(QDialog):
                 self.tags.append(tag.copy())
                 self.refresh_tags()
         return handler
-    
-    def get_contrast_font_color(self, bg_color: str):
-        bg_color = bg_color.lstrip("#")
-        r, g, b = int(bg_color[0:2], 16), int(bg_color[2:4], 16), int(bg_color[4:6], 16)
-        luminance = (0.299 * r + 0.587 * g + 0.114 * b)
-        return "#000000" if luminance > 186 else "#ffffff"

@@ -19,6 +19,7 @@ from widgets.tag_edit_dialog import TagEditDialog
 from widgets.flow_layout import FlowLayout
 from services.model_service import ModelService
 from convention.result_code import ResultCode
+from utils.ui_utils import create_tag_container
 
 MODELS_INFO_FILE = os.path.join("data", "models.json")
 
@@ -144,34 +145,35 @@ class ModelListPanel(QWidget):
             vbox.addWidget(QLabel(f"更新时间: {update_time}"))
             vbox.addWidget(QLabel(f"备注: {description}"))
 
-            if tags:
-                flow = FlowLayout(spacing=6)
-                for tag in tags:
-                    label = QLabel(tag["text"])
-                    color = tag["color"]
-                    text_color = self.get_contrast_font_color(color)
-                    label.setStyleSheet(f"""
-                            QLabel {{
-                                background-color: {color};
-                                color: {text_color};
-                                border-radius: 6px;
-                                padding: 2px 6px;
-                                font-size: 16px;
-                                min-height: 30px;
-                                max-height: 40px;
-                            }}
-                        """)
-                    label.setFixedHeight(24)
-                    flow.addWidget(label)
+            # if tags:
+            #     flow = FlowLayout(spacing=6)
+            #     for tag in tags:
+            #         label = QLabel(tag["text"])
+            #         color = tag["color"]
+            #         text_color = get_contrast_font_color(color)
+            #         label.setStyleSheet(f"""
+            #                 QLabel {{
+            #                     background-color: {color};
+            #                     color: {text_color};
+            #                     border-radius: 6px;
+            #                     padding: 2px 6px;
+            #                     font-size: 16px;
+            #                     min-height: 30px;
+            #                     max-height: 40px;
+            #                 }}
+            #             """)
+            #         label.setFixedHeight(24)
+            #         flow.addWidget(label)
 
-                tag_container = QWidget()
-                tag_container.setLayout(flow)
-                tag_container.setStyleSheet("background-color: transparent;")
-                vbox.addWidget(tag_container)
-            else:
-                label_no_tag = QLabel("无标签")
-                label_no_tag.setStyleSheet("color: gray; font-size: 18px;")
-                vbox.addWidget(label_no_tag)
+            #     tag_container = QWidget()
+            #     tag_container.setLayout(flow)
+            #     tag_container.setStyleSheet("background-color: transparent;")
+            #     vbox.addWidget(tag_container)
+            # else:
+            #     label_no_tag = QLabel("无标签")
+            #     label_no_tag.setStyleSheet("color: gray; font-size: 18px;")
+            #     vbox.addWidget(label_no_tag)
+            vbox.addWidget(create_tag_container(tags))
 
             hbox = QHBoxLayout()
             btn_open = QPushButton("打开目录")
@@ -213,12 +215,6 @@ class ModelListPanel(QWidget):
             vbox.addLayout(hbox)
             self.inner_layout.addWidget(group)
         self.inner_layout.addStretch()
-        
-    def get_contrast_font_color(self, bg_color: str):
-        bg_color = bg_color.lstrip("#")
-        r, g, b = int(bg_color[0:2], 16), int(bg_color[2:4], 16), int(bg_color[4:6], 16)
-        luminance = (0.299 * r + 0.587 * g + 0.114 * b)
-        return "#000000" if luminance > 186 else "#ffffff"
 
     def refresh(self):
         model_info = ModelService.load_model_info()
