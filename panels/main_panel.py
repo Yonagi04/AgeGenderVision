@@ -12,6 +12,7 @@ from panels.predict_video_panel import PredictVideoPanel
 from panels.dedup_panel import DedupPanel
 from panels.log_panel import LogPanel
 from panels.model_compare_panel import ModelComparePanel
+from panels.train_chart_panel import TrainChartPanel
 from utils.qss_loader import load_qss
 
 LIGHT_QSS_FILE = 'assets/light.qss'
@@ -70,6 +71,7 @@ class MainPanelWindow(QWidget):
         self.predict_video_panel = PredictVideoPanel(theme=theme)
         self.dedup_panel = DedupPanel(theme=theme)
         self.log_panel = LogPanel(theme=theme)
+        self.train_chart_panel = TrainChartPanel(theme=theme)
         self.stack.addWidget(self.train_panel)
         self.stack.addWidget(self.model_list_panel)
         self.stack.addWidget(self.model_compare_panel)
@@ -79,6 +81,7 @@ class MainPanelWindow(QWidget):
         self.stack.addWidget(self.predict_video_panel)
         self.stack.addWidget(self.dedup_panel)
         self.stack.addWidget(self.log_panel)
+        self.stack.addWidget(self.train_chart_panel)
         main_layout.addLayout(menu_layout, 1)
         main_layout.addWidget(self.stack, 4)
 
@@ -104,6 +107,7 @@ class MainPanelWindow(QWidget):
             if idx == 0 and not self.train_panel.is_running:
                 self.train_panel.log_text.clear()
                 self.train_panel.tqdm_bar.setValue(0)
+                self.train_panel.tqdm_label = QLabel("训练进度：0/0")
             elif idx == 3 and not self.predict_img_panel.is_running:
                 self.predict_img_panel.result_text.clear()
             elif idx == 4 and not self.predict_multi_img_panel.is_running:
@@ -170,3 +174,8 @@ class MainPanelWindow(QWidget):
     def show_compare_panel_with_model(self, model_name):
         self.model_compare_panel.set_model_a(model_name)
         self.switch_panel(2)
+
+    def show_train_chart_panel(self, metric_history):
+        self.train_chart_panel.metric_history = metric_history
+        self.train_chart_panel.update_metrics_plot(metric_history)
+        self.switch_panel(9)

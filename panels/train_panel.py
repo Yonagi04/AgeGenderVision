@@ -61,9 +61,6 @@ class TrainPanel(QWidget):
         btn_h.addWidget(self.btn_train)
         btn_h.addWidget(self.btn_stop)
         layout.addLayout(btn_h)
-        # self.progress = QProgressBar()
-        # self.progress.setRange(0, 100)
-        # layout.addWidget(self.progress)
         self.tqdm_label = QLabel("训练进度：0/0")
         self.tqdm_bar = QProgressBar()
         self.tqdm_bar.setRange(0, 100)
@@ -72,11 +69,20 @@ class TrainPanel(QWidget):
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
         layout.addWidget(self.log_text)
+        self.btn_show_chart = QPushButton("查看训练数据图表")
+        layout.addWidget(self.btn_show_chart)
         layout.addStretch()
         self.btn_train.clicked.connect(self.start_train)
         self.btn_stop.clicked.connect(self.stop_train)
+        self.btn_show_chart.clicked.connect(self.show_chart_panel)
         self.train_thread = None
         self.is_running = False
+        self.metric_history = {
+            "train_loss": [],
+            "val_age_loss": [],
+            "val_gender_loss": [],
+            "val_gender_acc": []
+        }
 
     def start_train(self):
         try:
@@ -148,6 +154,7 @@ class TrainPanel(QWidget):
         self.is_running = True
         self.train_thread = TrainThread(cmd, env)
         self.train_thread.log_signal.connect(self.log_text.append)
+        self.train_thread.metrics_signal.connect(self.update_metrics_plot)
         # self.train_thread.progress_signal.connect(self.progress.setValue)
         def update_tqdm(current, total):
             self.tqdm_label.setText(f"训练进度：{current}/{total}")
@@ -231,3 +238,21 @@ class TrainPanel(QWidget):
         if self.train_thread:
             self.train_thread.stop()
             self.log_text.append("已请求停止训练...")
+
+    def update_metrics_plot(self, metrics):
+        for k in self.metric_history:
+            self.metric_history[k].append(metrics[k])
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, 'train_chart_panel'):
+                parent.train_chart_panel.update_metrics_plot(self.metric_history)
+                break
+            parent = parent.parent()
+        
+    def show_chart_panel(self):
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, 'show_train_chart_panel'):
+                parent.show_train_chart_panel(self.metric_history)
+                break
+            parent = parent.parent()

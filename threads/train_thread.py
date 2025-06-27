@@ -8,6 +8,7 @@ class TrainThread(QThread):
     log_signal = pyqtSignal(str)
     progress_signal = pyqtSignal(int)
     tqdm_signal = pyqtSignal(int, int)
+    metrics_signal = pyqtSignal(dict)
     finished = pyqtSignal(object)
 
     def __init__(self, cmd, env):
@@ -49,6 +50,19 @@ class TrainThread(QThread):
                         if total_epochs:
                             percent = int(epoch / total_epochs * 100)
                             self.progress_signal.emit(percent)
+                if "Train Loss=" in line and "Val Age Loss=" in line:
+                    m = re.search(
+                        r"Train Loss=([0-9.]+)\s*\|\s*Val Age Loss=([0-9.]+)\s*\|\s*Val Gender Loss=([0-9.]+)\s*\|\s*Val Gender Acc=([0-9.]+)",
+                        line
+                    )
+                    if m:
+                        metrics = {
+                            "train_loss": float(m.group(1)),
+                            "val_age_loss": float(m.group(2)),
+                            "val_gender_loss": float(m.group(3)),
+                            "val_gender_acc": float(m.group(4))
+                        }
+                        self.metrics_signal.emit(metrics)
                 self.log_signal.emit(line)
                 if check_counter >= 20:
                     check_counter = 0
