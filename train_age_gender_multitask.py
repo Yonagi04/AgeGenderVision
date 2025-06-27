@@ -96,6 +96,36 @@ class MultiTaskResNet(nn.Module):
         gender = self.gender_head(feat)
         return age, gender
 
+class EarlyStopping:
+    def __init__(self, patience=3, mode='min', verbose=True):
+        self.patience = patience
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.mode = mode
+        self.verbose = verbose
+
+    def __call__(self, current_score, model, model_type, save_path, val_loader, device, epochs, batch_size, img_size, val_gender_loss, val_acc):
+        score = -current_score if self.mode == 'min' else current_score
+
+        if self.best_score is None or score > self.best_score:
+            self.best_score = score
+            self.counter = 0
+            torch.save(model.state_dict(), save_path)
+
+            save_model(model_type, save_path, model, val_loader, device, 
+                               epochs, batch_size, img_size, current_score, 
+                               val_gender_loss, val_acc)
+
+            if self.verbose:
+                print(f"EarlyStopping: New best score. Saving model.")
+        else:
+            self.counter += 1
+            if self.verbose:
+                print(f"EarlyStopping: {self.counter} epochs without improvement.")
+            if self.counter >= self.patience:
+                self.early_stop = True
+
 def evaluate(model, loader, device, age_criterion, gender_criterion):
     model.eval()
     total_age_loss, total_gender_loss, total, correct = 0, 0, 0, 0
@@ -258,6 +288,8 @@ def main():
         parser.add_argument('--data_dir', type=str, default='data/UTKFace/cleaned')
         parser.add_argument('--model_type', type=str, default='resnet18', choices=['resnet18', 'resnet34', 'resnet50'], help='选择模型类型')
         parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
+        parser.add_argument('--is_early_stopping', type=bool, default=False, help='是否启动Early Stopping')
+        parser.add_argument('--reduce_lr', type=bool, default=False, help='是否自动调节学习率')
         args = parser.parse_args()
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -289,6 +321,13 @@ def main():
         gender_criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+        if args.is_early_stopping:
+            print("已启动 Early Stopping 机制")
+            early_stopper = EarlyStopping(patience=3, mode='min', verbose=True)
+        if args.reduce_lr:
+            print("已启动 Learning Rate 自适应调节机制")
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
+
         print("训练开始，在一轮训练结束时可按 Q 键退出训练。")
         is_tty = sys.stdout.isatty()
         if os.path.exists(MODEL_DIR_FLAG):
@@ -296,7 +335,7 @@ def main():
         for epoch in range(args.epochs):
             model.train()
             total_loss = 0
-            if is_tty:
+            if not is_tty:
                 pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}")
             else:
                 pbar = tqdm(
@@ -341,6 +380,12 @@ def main():
                     sys.stdout.flush()
             avg_loss = total_loss / len(train_set)
             val_age_loss, val_gender_loss, val_acc = evaluate(model, val_loader, device, age_criterion, gender_criterion)
+            if args.reduce_lr:
+                scheduler.step(val_age_loss)
+            if args.is_early_stopping:
+                early_stopper(val_age_loss, model, args.model_type, args.model_path, 
+                                val_loader, device, args.epochs, args.batch_size, 
+                                args.img_size, val_age_loss, val_acc)
             print(f"Epoch {epoch+1}: Train Loss={avg_loss:.4f} | Val Age Loss={val_age_loss:.4f} | Val Gender Loss={val_gender_loss:.4f} | Val Gender Acc={val_acc:.4f}")
             time.sleep(1)
 

@@ -1,12 +1,14 @@
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QTextEdit, QComboBox, QFormLayout, QProgressBar
+    QTextEdit, QComboBox, QFormLayout, QProgressBar, QGridLayout,
+    QSpacerItem, QSizePolicy
 )
 import os
 import sys
 import json
 import datetime
 from threads.train_thread import TrainThread
+from widgets.switch import Switch
 
 MODELS_INFO_FILE = 'data/models.json'
 MODEL_DIR_FLAG = 'data/last_model_dir.txt'
@@ -35,6 +37,23 @@ class TrainPanel(QWidget):
         form.addRow("Learning rate", self.lr)
         form.addRow("Image size", self.img_size)
         layout.addLayout(form)
+        
+        self.switch_early = Switch()
+        grid_early = QGridLayout()
+        grid_early.addWidget(QLabel("Early Stopping"), 0, 0)
+        grid_early.addItem(QSpacerItem(10, 0, QSizePolicy.Fixed, QSizePolicy.Fixed), 0, 1)  # 只加一点横向间隔
+        grid_early.addWidget(self.switch_early, 0, 2)
+
+        layout.addLayout(grid_early)
+
+        self.switch_lr = Switch()
+        grid_lr = QGridLayout()
+        grid_lr.addWidget(QLabel("自适应Learning rate调整"), 0, 0)
+        grid_lr.addItem(QSpacerItem(10, 0, QSizePolicy.Fixed, QSizePolicy.Fixed), 0, 1)  # 只加一点横向间隔
+        grid_lr.addWidget(self.switch_lr, 0, 2)
+
+        layout.addLayout(grid_lr)
+
         self.btn_train = QPushButton("开始训练")
         self.btn_stop = QPushButton("停止训练")
         self.btn_stop.setEnabled(False)
@@ -42,9 +61,9 @@ class TrainPanel(QWidget):
         btn_h.addWidget(self.btn_train)
         btn_h.addWidget(self.btn_stop)
         layout.addLayout(btn_h)
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        layout.addWidget(self.progress)
+        # self.progress = QProgressBar()
+        # self.progress.setRange(0, 100)
+        # layout.addWidget(self.progress)
         self.tqdm_label = QLabel("训练进度：0/0")
         self.tqdm_bar = QProgressBar()
         self.tqdm_bar.setRange(0, 100)
@@ -69,6 +88,8 @@ class TrainPanel(QWidget):
             data_dir = self.data_dir.text().strip()
             model_type = self.model_type.currentText()
             model_path = self.model_path.text().strip()
+            is_lr = self.switch_lr.isChecked()
+            is_early = self.switch_early.isChecked()
             if batch_size <= 0 or epochs <= 0 or lr <= 0 or img_size <= 0:
                 raise ValueError("Batch size、Epochs、Learning rate、Image size 必须为正数")
             if not os.path.isdir(data_dir):
@@ -107,17 +128,27 @@ class TrainPanel(QWidget):
             "--img_size", str(img_size),
             "--data_dir", data_dir,
             "--model_type", model_type,
-            "--model_path", model_path
+            "--model_path", model_path,
+            "--is_early_stopping", str(is_early),
+            "--reduce_lr", str(is_lr)
         ]
         env = os.environ.copy()
         self.log_text.clear()
-        self.progress.setValue(0)
+        # self.progress.setValue(0)
         self.btn_train.setEnabled(False)
+        self.batch_size.setEnabled(False)
+        self.model_path.setEnabled(False)
+        self.model_type.setEnabled(False)
+        self.data_dir.setEnabled(False)
+        self.lr.setEnabled(False)
+        self.img_size.setEnabled(False)
+        self.switch_early.setCheckable(False)
+        self.switch_lr.setCheckable(False)
         self.btn_stop.setEnabled(True)
         self.is_running = True
         self.train_thread = TrainThread(cmd, env)
         self.train_thread.log_signal.connect(self.log_text.append)
-        self.train_thread.progress_signal.connect(self.progress.setValue)
+        # self.train_thread.progress_signal.connect(self.progress.setValue)
         def update_tqdm(current, total):
             self.tqdm_label.setText(f"训练进度：{current}/{total}")
             if total > 0:
@@ -128,6 +159,14 @@ class TrainPanel(QWidget):
         self.train_thread.tqdm_signal.connect(update_tqdm)
         def on_finish(error):
             self.btn_train.setEnabled(True)
+            self.batch_size.setEnabled(True)
+            self.model_path.setEnabled(True)
+            self.model_type.setEnabled(True)
+            self.data_dir.setEnabled(True)
+            self.lr.setEnabled(True)
+            self.img_size.setEnabled(True)
+            self.switch_early.setCheckable(True)
+            self.switch_lr.setCheckable(True)
             self.btn_stop.setEnabled(False)
             self.is_running = False
             if error:
