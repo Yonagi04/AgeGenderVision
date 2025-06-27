@@ -28,10 +28,23 @@ class ModelComparePanel(QWidget):
     def init_ui(self):
         main_layout = QVBoxLayout(self)
 
+        hbox = QHBoxLayout()
+
+        self.btn_back = QPushButton()
+        if self.theme == 'light':
+            self.btn_back.setIcon(QIcon("assets/svg/back_light.svg"))
+        else:
+            self.btn_back.setIcon(QIcon("assets/svg/back_dark.svg"))
+        self.btn_back.setIconSize(QSize(28, 28))
+        self.btn_back.setFixedSize(36, 36)
+        self.btn_back.setStyleSheet("border:none; background:transparent;")
+        hbox.addWidget(self.btn_back)
+
         title = QLabel("模型对比")
         title.setAlignment(Qt.AlignCenter)
         title.setStyleSheet("font-size: 32px; font-weight: bold; margin-bottom: 20px;")
-        main_layout.addWidget(title)
+        hbox.addWidget(title)
+        main_layout.addLayout(hbox)
 
         select_layout = QHBoxLayout()
         select_layout.addWidget(QLabel("选择模型A:"))
@@ -51,8 +64,8 @@ class ModelComparePanel(QWidget):
             self.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
         else:
             self.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
-        self.btn_refresh.setIconSize(QSize(28, 28))
-        self.btn_refresh.setFixedSize(36, 36)
+        self.btn_refresh.setIconSize(QSize(20, 20))
+        self.btn_refresh.setFixedSize(28, 28)
         self.btn_refresh.setStyleSheet("border:none; background:transparent;")
         select_layout.addWidget(self.btn_refresh)
 
@@ -76,6 +89,7 @@ class ModelComparePanel(QWidget):
         
         self.combo_a.currentIndexChanged.connect(self.do_compare)
         self.combo_b.currentIndexChanged.connect(self.do_compare)
+        self.btn_back.clicked.connect(self.go_back)
         self.btn_refresh.clicked.connect(self.refresh)
 
     def do_compare(self):
@@ -147,3 +161,17 @@ class ModelComparePanel(QWidget):
                 icon=QMessageBox.Critical
             )
             msg_box.exec_()
+
+    def set_model_a(self, model_name):
+        self.refresh()
+        index = self.combo_a.findText(model_name)
+        if index >= 0:
+            self.combo_a.setCurrentIndex(index)
+
+    def go_back(self):
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "switch_panel"):
+                parent.switch_panel(1)
+                break
+            parent = parent.parent()

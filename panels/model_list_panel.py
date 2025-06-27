@@ -207,6 +207,7 @@ class ModelListPanel(QWidget):
             menu.addAction("设置备注", lambda m=model_name,d=description: self.set_description(m, d))
             menu.addAction("设置标签", lambda m=model_name, t=tags: self.set_tags(m, t))
             menu.addAction("修改模型类型", lambda m=model_name, t=model_type: self.update_model_type(m, t))
+            menu.addAction("模型比较", lambda m=model_name: self.open_compare(m))
             menu.addAction("查看模型结构", lambda m=model_name: self.view_model_structure(m))
             menu.addAction("删除模型", lambda m=model_name, d=model_dir: self.delete_model(m, d))
             btn_more.setMenu(menu)
@@ -740,3 +741,11 @@ class ModelListPanel(QWidget):
         save_path = result.data
         self.viewer = NetronLocalBrowserViewer(save_path)
         self.viewer.start()
+
+    def open_compare(self, model_name):
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "show_compare_panel_with_model"):
+                parent.show_compare_panel_with_model(model_name)
+                break
+            parent = parent.parent()

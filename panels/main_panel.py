@@ -30,7 +30,6 @@ class MainPanelWindow(QWidget):
         menu_layout.setSpacing(10)
         self.btn_train = QPushButton("训练模型")
         self.btn_models = QPushButton("模型管理")
-        self.btn_compare = QPushButton("模型对比")
         self.btn_predict_img = QPushButton("图片预测")
         self.btn_predict_multi_img = QPushButton("多模型图片预测")
         self.btn_predict_camera = QPushButton("摄像头采集预测")
@@ -47,7 +46,6 @@ class MainPanelWindow(QWidget):
         self.btn_theme.setStyleSheet("border:none; background:transparent;")
         menu_layout.addWidget(self.btn_train)
         menu_layout.addWidget(self.btn_models)
-        menu_layout.addWidget(self.btn_compare)
         menu_layout.addWidget(self.btn_predict_img)
         menu_layout.addWidget(self.btn_predict_multi_img)
         menu_layout.addWidget(self.btn_predict_camera)
@@ -57,7 +55,7 @@ class MainPanelWindow(QWidget):
         menu_layout.addStretch()
         menu_layout.addWidget(self.btn_theme)
         for btn in [
-            self.btn_train, self.btn_models, self.btn_compare, self.btn_predict_img, self.btn_predict_multi_img,
+            self.btn_train, self.btn_models, self.btn_predict_img, self.btn_predict_multi_img,
             self.btn_predict_camera, self.btn_predict_video, self.btn_dedup, self.btn_log
         ]:
             btn.setObjectName("menuButton")
@@ -87,7 +85,6 @@ class MainPanelWindow(QWidget):
         self.current_panel_idx = 0
         self.btn_train.clicked.connect(lambda: self.switch_panel(0))
         self.btn_models.clicked.connect(lambda: (self.model_list_panel.refresh(), self.switch_panel(1)))
-        self.btn_compare.clicked.connect(lambda: self.switch_panel(2))
         self.btn_predict_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(3)))
         self.btn_predict_multi_img.clicked.connect(lambda: (self.predict_img_panel.refresh_models(), self.switch_panel(4)))
         self.btn_predict_camera.clicked.connect(lambda: (self.predict_camera_panel.refresh_models(), self.switch_panel(5)))
@@ -106,14 +103,15 @@ class MainPanelWindow(QWidget):
         if idx != self.current_panel_idx:
             if idx == 0 and not self.train_panel.is_running:
                 self.train_panel.log_text.clear()
-            elif idx == 2 and not self.predict_img_panel.is_running:
+                self.train_panel.tqdm_bar.setValue(0)
+            elif idx == 3 and not self.predict_img_panel.is_running:
                 self.predict_img_panel.result_text.clear()
-            elif idx == 3 and not self.predict_multi_img_panel.is_running:
+            elif idx == 4 and not self.predict_multi_img_panel.is_running:
                 self.predict_multi_img_panel.result_text.clear()
                 self.predict_multi_img_panel.refresh_models()
-            elif idx == 4 and not self.predict_camera_panel.is_running:
+            elif idx == 5 and not self.predict_camera_panel.is_running:
                 self.predict_camera_panel.result_text.clear()
-            elif idx == 5 and not self.predict_video_panel.is_running:
+            elif idx == 6 and not self.predict_video_panel.is_running:
                 self.predict_video_panel.result_text.clear()
                 self.predict_video_panel.video_preview = QLabel("处理后的视频将在此处播放")
                 self.predict_video_panel.video_preview.setFixedHeight(500)
@@ -136,6 +134,7 @@ class MainPanelWindow(QWidget):
             self.model_list_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.model_list_panel.btn_download.setIcon(QIcon("assets/svg/download_dark.svg"))
             self.model_list_panel.btn_upload.setIcon(QIcon("assets/svg/upload_dark.svg"))
+            self.model_compare_panel.btn_back.setIcon(QIcon("assets/svg/back_dark.svg"))
             self.model_compare_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.log_panel.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.log_panel.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
@@ -156,6 +155,7 @@ class MainPanelWindow(QWidget):
             self.model_list_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.model_list_panel.btn_download.setIcon(QIcon("assets/svg/download_light.svg"))
             self.model_list_panel.btn_upload.setIcon(QIcon("assets/svg/upload_light.svg"))
+            self.model_compare_panel.btn_back.setIcon(QIcon("assets/svg/back_light.svg"))
             self.model_compare_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.log_panel.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.log_panel.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
@@ -166,3 +166,7 @@ class MainPanelWindow(QWidget):
             self.predict_video_panel.btn_forward.setIcon(QIcon("assets/svg/forward_light.svg"))
             self.predict_video_panel.btn_backward.setIcon(QIcon("assets/svg/backward_light.svg"))
             self.current_theme = "light"
+
+    def show_compare_panel_with_model(self, model_name):
+        self.model_compare_panel.set_model_a(model_name)
+        self.switch_panel(2)
