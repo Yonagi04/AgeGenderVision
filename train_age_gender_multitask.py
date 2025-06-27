@@ -104,25 +104,26 @@ class EarlyStopping:
         self.early_stop = False
         self.mode = mode
         self.verbose = verbose
+        self.best_val_age_loss = None
+        self.best_val_gender_loss = None
+        self.best_val_acc = None
 
-    def __call__(self, current_score, model, model_type, save_path, val_loader, device, epochs, batch_size, img_size, val_gender_loss, val_acc):
-        score = -current_score if self.mode == 'min' else current_score
+    def __call__(self, model, val_age_loss, val_gender_loss, val_acc):
+        composite_score = 0.7 * (1 - val_gender_loss) + 0.3 * (1 / (val_age_loss + 1e-6))
 
-        if self.best_score is None or score > self.best_score:
-            self.best_score = score
+        if self.best_score is None or composite_score > self.best_score:
+            self.best_score = composite_score
             self.counter = 0
-            torch.save(model.state_dict(), save_path)
-
-            save_model(model_type, save_path, model, val_loader, device, 
-                               epochs, batch_size, img_size, current_score, 
-                               val_gender_loss, val_acc)
-
+            torch.save(model.state_dict(), 'best_model_temp.pth')
+            self.best_val_acc = val_acc
+            self.best_val_age_loss = val_age_loss
+            self.best_val_gender_loss = val_gender_loss
             if self.verbose:
-                print(f"EarlyStopping: New best score. Saving model.")
+                print(f"EarlyStopping: 最新最优模型，保存至 best_model_temp.pth")
         else:
             self.counter += 1
             if self.verbose:
-                print(f"EarlyStopping: {self.counter} epochs without improvement.")
+                print(f"EarlyStopping: {self.counter} epochs 无提升")
             if self.counter >= self.patience:
                 self.early_stop = True
 
@@ -372,7 +373,7 @@ def main():
                 pred_age, pred_gender = model(imgs)
                 age_loss = age_criterion(pred_age, ages)
                 gender_loss = gender_criterion(pred_gender, genders)
-                loss = age_loss + gender_loss
+                loss = 1.2 * age_loss + 1.0 * gender_loss
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item() * imgs.size(0)
@@ -383,9 +384,17 @@ def main():
             if args.reduce_lr:
                 scheduler.step(val_age_loss)
             if args.is_early_stopping:
-                early_stopper(val_age_loss, model, args.model_type, args.model_path, 
-                                val_loader, device, args.epochs, args.batch_size, 
-                                args.img_size, val_age_loss, val_acc)
+                early_stopper(model, val_age_loss, val_acc, val_gender_loss)
+            if args.is_early_stopping and early_stopper.early_stop:
+                print("Early stopping 被触发，加载最佳模型并保存...")
+                model.load_state_dict(torch.load("best_model_temp.pth"))
+                save_model(args.model_type, args.model_path, model, val_loader, device, 
+                               args.epochs, args.batch_size, args.img_size, 
+                               early_stopper.best_val_age_loss, 
+                               early_stopper.best_val_gender_loss,
+                               early_stopper.best_val_acc)
+                os.remove("best_model_temp.pth")
+                return
             print(f"Epoch {epoch+1}: Train Loss={avg_loss:.4f} | Val Age Loss={val_age_loss:.4f} | Val Gender Loss={val_gender_loss:.4f} | Val Gender Acc={val_acc:.4f}")
             time.sleep(1)
 
