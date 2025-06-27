@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QUrl, QSize
 from PyQt5.QtGui import QDesktopServices, QIcon
 import os
-import zipfile
 import copy
 import shutil
 from threads.model_import_thread import ModelImportThread
@@ -112,7 +111,7 @@ class ModelListPanel(QWidget):
         return theme
 
     def update_model_list(self, info_dict: dict):
-        if self.sort_by in ['created_time', 'updated_time']:
+        if self.sort_by in ['created_time', 'update_time']:
             sorted_items = sorted(
                 info_dict.items(),
                 key=lambda x: x[1].get(self.sort_by, ""),
