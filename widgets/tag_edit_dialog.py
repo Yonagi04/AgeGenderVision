@@ -116,11 +116,12 @@ class TagEditDialog(QDialog):
 
     def create_tag_widget(self, tag):
         color = tag.get("color", "#aaa")
+        bg_color = get_contrast_font_color(color)
         text = tag.get("text", "")
         widget = QWidget()
         layout = QHBoxLayout(widget)
         label = QLabel(text)
-        label.setStyleSheet(f"background-color: {color}; color: white; border-radius: 4px; padding: 2px 6px;")
+        label.setStyleSheet(f"background-color: {color}; color: {bg_color}; border-radius: 4px; padding: 2px 6px;")
         remove_btn = QPushButton("×")
         remove_btn.setFixedWidth(20)
         remove_btn.clicked.connect(lambda: self.remove_tag(tag))
