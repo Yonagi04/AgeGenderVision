@@ -109,7 +109,7 @@ class EarlyStopping:
         self.best_val_acc = None
 
     def __call__(self, model, val_age_loss, val_gender_loss, val_acc):
-        composite_score = 0.7 * (1 - val_gender_loss) + 0.3 * (1 / (val_age_loss + 1e-6))
+        composite_score = 0.7 * val_acc + 0.3 * (1 / (val_age_loss + 1e-6))
 
         if self.best_score is None or composite_score > self.best_score:
             self.best_score = composite_score
