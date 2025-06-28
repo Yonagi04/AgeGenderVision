@@ -44,6 +44,8 @@ class TrainChartPanel(QWidget):
         self.chart_stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.btn_export = QPushButton("导出图表")
         layout.addWidget(self.btn_export)
+        self.btn_clear = QPushButton("清空图表")
+        layout.addWidget(self.btn_clear)
 
         layout.addStretch()
         self.metric_history = {
@@ -54,6 +56,7 @@ class TrainChartPanel(QWidget):
         }
         self.btn_back.clicked.connect(self.go_back)
         self.btn_export.clicked.connect(self.export_plot)
+        self.btn_clear.clicked.connect(self.clear_plot)
 
     def get_current_theme(self):
         theme = "light"
@@ -116,3 +119,15 @@ class TrainChartPanel(QWidget):
         )
         msg_box.exec_()
         QDesktopServices.openUrl(QUrl.fromLocalFile(dir_path))
+    
+    def clear_plot(self):
+        for k in self.metric_history:
+            self.metric_history[k] = []
+        ylabels = ['Train Loss', 'Val Age Loss', 'Val Gender Loss', 'Val Gender Acc']
+        for i, (fig, canvas) in enumerate(self.charts):
+            fig.clear()
+            ax = fig.add_subplot(111)
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(ylabels[i])
+            ax.grid(True)
+            canvas.draw()

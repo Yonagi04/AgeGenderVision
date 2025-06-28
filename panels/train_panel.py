@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QTextEdit, QComboBox, QFormLayout, QProgressBar, QGridLayout,
-    QSpacerItem, QSizePolicy
+    QSpacerItem, QSizePolicy, QMessageBox
 )
 import os
 import sys
@@ -9,6 +9,7 @@ import json
 import datetime
 from threads.train_thread import TrainThread
 from widgets.switch import Switch
+from widgets.message_box import MessageBox
 
 MODELS_INFO_FILE = 'data/models.json'
 MODEL_DIR_FLAG = 'data/last_model_dir.txt'
@@ -16,8 +17,8 @@ STOP_FLAG_FILE = os.path.abspath("stop.flag")
 
 class TrainPanel(QWidget):
     def __init__(self, parent=None, theme='light'):
-        self.theme = theme
         super().__init__(parent)
+        self.theme = theme
         self.setContentsMargins(20, 20, 20, 20)
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -84,6 +85,16 @@ class TrainPanel(QWidget):
             "val_gender_acc": []
         }
 
+    def get_current_theme(self):
+        theme = "light"
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "current_theme"):
+                theme = parent.current_theme
+                break
+            parent = parent.parent()
+        return theme
+
     def start_train(self):
         try:
             self.log_text.clear()
@@ -140,6 +151,7 @@ class TrainPanel(QWidget):
         ]
         env = os.environ.copy()
         self.log_text.clear()
+        self.clear_plot()
         # self.progress.setValue(0)
         self.btn_train.setEnabled(False)
         self.batch_size.setEnabled(False)
@@ -165,6 +177,7 @@ class TrainPanel(QWidget):
                 self.tqdm_bar.setValue(0)
         self.train_thread.tqdm_signal.connect(update_tqdm)
         def on_finish(error):
+            self.theme = self.get_current_theme()
             self.btn_train.setEnabled(True)
             self.batch_size.setEnabled(True)
             self.model_path.setEnabled(True)
@@ -178,8 +191,22 @@ class TrainPanel(QWidget):
             self.is_running = False
             if error:
                 self.log_text.append(f"训练失败：{error}")
+                msg_box = MessageBox(
+                    parent=self,
+                    title='错误',
+                    text=f'训练失败: {error}',
+                    theme=self.theme,
+                    icon = QMessageBox.Critical
+                )
+                msg_box.exec_()
             else:
                 self.log_text.append("训练完成！")
+                msg_box = MessageBox(
+                    parent=self,
+                    text='训练完成',
+                    theme=self.theme
+                )
+                msg_box.show()
                 last_model_dir = None
                 if os.path.exists(MODEL_DIR_FLAG):
                     with open(MODEL_DIR_FLAG, 'r', encoding='utf-8') as f:
@@ -256,3 +283,12 @@ class TrainPanel(QWidget):
                 parent.show_train_chart_panel(self.metric_history)
                 break
             parent = parent.parent()
+
+    def clear_plot(self):
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, 'train_chart_panel'):
+                parent.train_chart_panel.clear_plot()
+                break
+            parent = parent.parent()
+ 
