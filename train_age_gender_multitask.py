@@ -20,7 +20,7 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms, models
 from PIL import Image
 from tqdm import tqdm
-
+from collections import deque
 
 LOG_FILE = 'error_log.log'
 MODEL_DIR_FLAG = 'data/last_model_dir.txt'
@@ -97,21 +97,39 @@ class MultiTaskResNet(nn.Module):
         return age, gender
 
 class EarlyStopping:
-    def __init__(self, patience=3, mode='min', verbose=True):
+    def __init__(self, patience=5, min_delta=1e-4, verbose=True, w_gender=0.6, w_age=0.4):
         self.patience = patience
+        self.min_delta = min_delta
+        self.verbose = verbose
+        self.w_gender = w_gender
+        self.w_age = w_age
+
         self.counter = 0
         self.best_score = None
         self.early_stop = False
-        self.mode = mode
-        self.verbose = verbose
+
         self.best_val_age_loss = None
         self.best_val_gender_loss = None
         self.best_val_acc = None
 
     def __call__(self, model, val_age_loss, val_gender_loss, val_acc):
-        composite_score = 0.7 * val_acc + 0.3 * (1 / (val_age_loss + 1e-6))
+        age_score = 1 / (val_age_loss + 1e-6)
+        gender_score = val_acc
+        composite_score = self.w_gender * gender_score + self.w_age * age_score
 
-        if self.best_score is None or composite_score > self.best_score:
+        if self.verbose:
+            print(f"[EarlyStopping] val_acc={val_acc:.4f}, val_age_loss={val_age_loss:.4f}, "
+                  f"age_score={age_score:.4f}, composite_score={composite_score:.4f}")
+
+        if self.best_score is None:
+            self.best_score = composite_score
+            torch.save(model.state_dict(), 'best_model_temp.pth')
+            self.best_val_acc = val_acc
+            self.best_val_age_loss = val_age_loss
+            self.best_val_gender_loss = val_gender_loss
+            if self.verbose:
+                print("[EarlyStopping] 最优模型已保存到 best_model_temp.pth")
+        elif composite_score > self.best_score + self.min_delta:
             self.best_score = composite_score
             self.counter = 0
             torch.save(model.state_dict(), 'best_model_temp.pth')
@@ -119,11 +137,11 @@ class EarlyStopping:
             self.best_val_age_loss = val_age_loss
             self.best_val_gender_loss = val_gender_loss
             if self.verbose:
-                print(f"EarlyStopping: 最新最优模型，保存至 best_model_temp.pth")
+                print("[EarlyStopping] 有明显提升，更新最优模型！")
         else:
             self.counter += 1
             if self.verbose:
-                print(f"EarlyStopping: {self.counter} epochs 无提升")
+                print(f"[EarlyStopping] {self.counter} epoch 无明显提升 (patience={self.patience})")
             if self.counter >= self.patience:
                 self.early_stop = True
 
@@ -289,8 +307,10 @@ def main():
         parser.add_argument('--data_dir', type=str, default='data/UTKFace/cleaned')
         parser.add_argument('--model_type', type=str, default='resnet18', choices=['resnet18', 'resnet34', 'resnet50'], help='选择模型类型')
         parser.add_argument('--model_path', type=str, default='age_gender_multitask_resnet18.pth')
-        parser.add_argument('--is_early_stopping', type=bool, default=False, help='是否启动Early Stopping')
-        parser.add_argument('--reduce_lr', type=bool, default=False, help='是否自动调节学习率')
+        parser.add_argument('--is_early_stopping', action='store_true', help='是否启动Early Stopping')
+        parser.set_defaults(is_early_stopping=False)
+        parser.add_argument('--reduce_lr', action='store_true', help='是否自动调节学习率')
+        parser.set_defaults(reduce_lr=False)
         args = parser.parse_args()
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -324,7 +344,7 @@ def main():
 
         if args.is_early_stopping:
             print("已启动 Early Stopping 机制")
-            early_stopper = EarlyStopping(patience=3, mode='min', verbose=True)
+            early_stopper = EarlyStopping(patience=10, min_delta=1e-4, verbose=True, w_gender=0.6, w_age=0.4)
         if args.reduce_lr:
             print("已启动 Learning Rate 自适应调节机制")
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)

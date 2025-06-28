@@ -146,9 +146,11 @@ class TrainPanel(QWidget):
             "--data_dir", data_dir,
             "--model_type", model_type,
             "--model_path", model_path,
-            "--is_early_stopping", str(is_early),
-            "--reduce_lr", str(is_lr)
         ]
+        if is_early:
+            cmd.append("--is_early_stopping")
+        if is_lr:
+            cmd.append("--reduce_lr")
         env = os.environ.copy()
         self.log_text.clear()
         self.clear_plot()
