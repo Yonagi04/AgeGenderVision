@@ -1,8 +1,13 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QStackedWidget, QSizePolicy
+import os
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+    QStackedWidget, QSizePolicy, QFileDialog, QMessageBox
+)
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from PyQt5.QtCore import QSize
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import QSize, QUrl
+from PyQt5.QtGui import QIcon, QDesktopServices
+from widgets.message_box import MessageBox
 
 class TrainChartPanel(QWidget):
     def __init__(self, parent=None, theme='light'):
@@ -37,6 +42,8 @@ class TrainChartPanel(QWidget):
             self.chart_stack.addWidget(canvas)
         layout.addWidget(self.chart_stack)
         self.chart_stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.btn_export = QPushButton("导出图表")
+        layout.addWidget(self.btn_export)
 
         layout.addStretch()
         self.metric_history = {
@@ -46,6 +53,17 @@ class TrainChartPanel(QWidget):
             "val_gender_acc": []
         }
         self.btn_back.clicked.connect(self.go_back)
+        self.btn_export.clicked.connect(self.export_plot)
+
+    def get_current_theme(self):
+        theme = "light"
+        parent = self.parent()
+        while parent is not None:
+            if hasattr(parent, "current_theme"):
+                theme = parent.current_theme
+                break
+            parent = parent.parent()
+        return theme
 
     def update_metrics_plot(self, metrics):
         for k in self.metric_history:
@@ -69,3 +87,32 @@ class TrainChartPanel(QWidget):
                 parent.switch_panel(0)
                 break
             parent = parent.parent()
+
+    def export_plot(self):
+        self.theme = self.get_current_theme()
+        dir_path = QFileDialog.getExistingDirectory(self, "选择导出文件夹")
+        if not dir_path:
+            return
+        names = ['train_loss', 'val_age_loss', 'val_gender_loss', 'val_gender_acc']
+        ylabels = ['Train Loss', 'Val Age Loss', 'Val Gender Loss', 'Val Gender Acc']
+        for i, (fig, _) in enumerate(self.charts):
+            file_path = os.path.join(dir_path, f"{names[i]}.png")
+            try:
+                fig.savefig(file_path, dpi=150, bbox_inches='tight')
+            except Exception as e:
+                msg_box = MessageBox(
+                    parent=self,
+                    title='错误',
+                    text=f'导出 {ylabels[i]} 图表失败: {e}',
+                    icon=QMessageBox.Critical,
+                    theme=self.theme
+                )
+                msg_box.exec_()
+                return
+        msg_box = MessageBox(
+            parent=self,
+            text='导出成功',
+            theme=self.theme
+        )
+        msg_box.exec_()
+        QDesktopServices.openUrl(QUrl.fromLocalFile(dir_path))
