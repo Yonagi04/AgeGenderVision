@@ -13,6 +13,7 @@ from panels.dedup_panel import DedupPanel
 from panels.log_panel import LogPanel
 from panels.model_compare_panel import ModelComparePanel
 from panels.train_chart_panel import TrainChartPanel
+from panels.dataset_manage_panel import DatasetManagePanel
 from utils.qss_loader import load_qss
 
 LIGHT_QSS_FILE = 'assets/light.qss'
@@ -36,6 +37,7 @@ class MainPanelWindow(QWidget):
         self.btn_predict_camera = QPushButton("摄像头采集预测")
         self.btn_predict_video = QPushButton("视频预测")
         self.btn_dedup = QPushButton("数据集去重")
+        self.btn_dataset = QPushButton("数据集管理")
         self.btn_log = QPushButton("查看日志")
         self.btn_theme = QPushButton()
         if theme == 'light':
@@ -52,12 +54,13 @@ class MainPanelWindow(QWidget):
         menu_layout.addWidget(self.btn_predict_camera)
         menu_layout.addWidget(self.btn_predict_video)
         menu_layout.addWidget(self.btn_dedup)
+        menu_layout.addWidget(self.btn_dataset)
         menu_layout.addWidget(self.btn_log)
         menu_layout.addStretch()
         menu_layout.addWidget(self.btn_theme)
         for btn in [
             self.btn_train, self.btn_models, self.btn_predict_img, self.btn_predict_multi_img,
-            self.btn_predict_camera, self.btn_predict_video, self.btn_dedup, self.btn_log
+            self.btn_predict_camera, self.btn_predict_video, self.btn_dedup, self.btn_log, self.btn_dataset
         ]:
             btn.setObjectName("menuButton")
 
@@ -72,6 +75,7 @@ class MainPanelWindow(QWidget):
         self.dedup_panel = DedupPanel(theme=theme)
         self.log_panel = LogPanel(theme=theme)
         self.train_chart_panel = TrainChartPanel(theme=theme)
+        self.dataset_manage_panel = DatasetManagePanel(theme=theme)
         self.stack.addWidget(self.train_panel)
         self.stack.addWidget(self.model_list_panel)
         self.stack.addWidget(self.model_compare_panel)
@@ -82,6 +86,7 @@ class MainPanelWindow(QWidget):
         self.stack.addWidget(self.dedup_panel)
         self.stack.addWidget(self.log_panel)
         self.stack.addWidget(self.train_chart_panel)
+        self.stack.addWidget(self.dataset_manage_panel)
         main_layout.addLayout(menu_layout, 1)
         main_layout.addWidget(self.stack, 4)
 
@@ -94,6 +99,7 @@ class MainPanelWindow(QWidget):
         self.btn_predict_video.clicked.connect(lambda: (self.predict_video_panel.refresh_models(), self.switch_panel(6)))
         self.btn_dedup.clicked.connect(lambda: self.switch_panel(7))
         self.btn_log.clicked.connect(lambda: (self.log_panel.refresh_run_log(), self.log_panel.refresh_error_log(), self.switch_panel(8)))
+        self.btn_dataset.clicked.connect(lambda: self.switch_panel(10))
         self.btn_theme.clicked.connect(self.toggle_theme)
         self.switch_panel(0)
 
@@ -142,12 +148,14 @@ class MainPanelWindow(QWidget):
             self.model_compare_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.log_panel.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
             self.log_panel.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_dark.svg"))
-            if self.predict_video_panel.is_paused:
-                self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/play_dark.svg"))
-            else:
-                self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/pause_dark.svg"))
-            self.predict_video_panel.btn_forward.setIcon(QIcon("assets/svg/forward_dark.svg"))
-            self.predict_video_panel.btn_backward.setIcon(QIcon("assets/svg/backward_dark.svg"))
+            # if self.predict_video_panel.is_paused:
+            #     self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/play_dark.svg"))
+            # else:
+            #     self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/pause_dark.svg"))
+            # self.predict_video_panel.btn_forward.setIcon(QIcon("assets/svg/forward_dark.svg"))
+            # self.predict_video_panel.btn_backward.setIcon(QIcon("assets/svg/backward_dark.svg"))
+            self.dataset_manage_panel.btn_export.setIcon(QIcon("assets/svg/download_dark.svg"))
+            self.dataset_manage_panel.btn_import.setIcon(QIcon("assets/svg/upload_dark.svg"))
             self.current_theme = "dark"
         else:
             load_qss(app, LIGHT_QSS_FILE)
@@ -163,12 +171,14 @@ class MainPanelWindow(QWidget):
             self.model_compare_panel.btn_refresh.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.log_panel.run_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
             self.log_panel.error_log_refresh_btn.setIcon(QIcon("assets/svg/refresh_light.svg"))
-            if self.predict_video_panel.is_paused:
-                self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/play_light.svg"))
-            else:
-                self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/pause_light.svg"))
-            self.predict_video_panel.btn_forward.setIcon(QIcon("assets/svg/forward_light.svg"))
-            self.predict_video_panel.btn_backward.setIcon(QIcon("assets/svg/backward_light.svg"))
+            # if self.predict_video_panel.is_paused:
+            #     self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/play_light.svg"))
+            # else:
+            #     self.predict_video_panel.btn_pause.setIcon(QIcon("assets/svg/pause_light.svg"))
+            # self.predict_video_panel.btn_forward.setIcon(QIcon("assets/svg/forward_light.svg"))
+            # self.predict_video_panel.btn_backward.setIcon(QIcon("assets/svg/backward_light.svg"))
+            self.dataset_manage_panel.btn_export.setIcon(QIcon("assets/svg/download_light.svg"))
+            self.dataset_manage_panel.btn_import.setIcon(QIcon("assets/svg/upload_light.svg"))
             self.current_theme = "light"
 
     def show_compare_panel_with_model(self, model_name):
